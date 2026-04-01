@@ -99,7 +99,7 @@ export function AppSidebar() {
 
       <SidebarContent className="px-2">
         {moduleGroups.map((group, gi) => (
-          <SidebarGroup key={group.label} defaultOpen={gi < 3}>
+          <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted px-3 mb-1">
               {!collapsed && group.label}
             </SidebarGroupLabel>
