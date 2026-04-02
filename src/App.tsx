@@ -3,10 +3,13 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import ModulePage from "@/pages/ModulePage";
 import LoginPage from "@/pages/auth/LoginPage";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import ProjectsPage from "@/pages/build/ProjectsPage";
 import SchedulePage from "@/pages/build/SchedulePage";
 import RFIsPage from "@/pages/build/RFIsPage";
@@ -23,7 +26,6 @@ const queryClient = new QueryClient();
 
 const stubModules = [
   { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/draws", title: "Draw Requests", desc: "Submit and approve draw requests with workflows.", module: "SiteSync Ops" },
   { path: "/ops/tenants", title: "Tenants", desc: "Manage tenant leases, contacts, and communications.", module: "SiteSync Ops" },
@@ -44,32 +46,37 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={
-            <AppLayout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/vault/properties" element={<PropertiesPage />} />
-                <Route path="/vault/roi" element={<ROICalculatorPage />} />
-                <Route path="/vault/lender" element={<LenderPortalPage />} />
-                <Route path="/build/projects" element={<ProjectsPage />} />
-                <Route path="/build/rfis" element={<RFIsPage />} />
-                <Route path="/build/submittals" element={<SubmittalsPage />} />
-                <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
-                <Route path="/build/daily-reports" element={<DailyReportsPage />} />
-                <Route path="/build/schedule" element={<SchedulePage />} />
-                <Route path="/treasury/ledger" element={<TreasuryPage />} />
-                <Route path="/treasury/milestones" element={<TreasuryPage />} />
-                <Route path="/treasury/approvals" element={<TreasuryPage />} />
-                {stubModules.map((m) => (
-                  <Route key={m.path} path={m.path} element={<ModulePage title={m.title} description={m.desc} module={m.module} />} />
-                ))}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AppLayout>
-          } />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/vault/properties" element={<PropertiesPage />} />
+                    <Route path="/vault/roi" element={<ROICalculatorPage />} />
+                    <Route path="/vault/lender" element={<LenderPortalPage />} />
+                    <Route path="/build/projects" element={<ProjectsPage />} />
+                    <Route path="/build/rfis" element={<RFIsPage />} />
+                    <Route path="/build/submittals" element={<SubmittalsPage />} />
+                    <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
+                    <Route path="/build/daily-reports" element={<DailyReportsPage />} />
+                    <Route path="/build/schedule" element={<SchedulePage />} />
+                    <Route path="/treasury/ledger" element={<TreasuryPage />} />
+                    <Route path="/treasury/milestones" element={<TreasuryPage />} />
+                    <Route path="/treasury/approvals" element={<TreasuryPage />} />
+                    {stubModules.map((m) => (
+                      <Route key={m.path} path={m.path} element={<ModulePage title={m.title} description={m.desc} module={m.module} />} />
+                    ))}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
