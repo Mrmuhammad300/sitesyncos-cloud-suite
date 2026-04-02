@@ -23,10 +23,7 @@ const queryClient = new QueryClient();
 
 const stubModules = [
   { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/build/rfis", title: "RFIs", desc: "Track requests for information across all projects.", module: "SiteSync Build" },
-  { path: "/build/submittals", title: "Submittals", desc: "Manage submittal workflows and approvals.", module: "SiteSync Build" },
-  { path: "/build/change-orders", title: "Change Orders", desc: "Process and track construction change orders.", module: "SiteSync Build" },
-  { path: "/build/daily-reports", title: "Daily Reports", desc: "Field reports, weather logs, and crew tracking.", module: "SiteSync Build" },
+  { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/draws", title: "Draw Requests", desc: "Submit and approve draw requests with workflows.", module: "SiteSync Ops" },
   { path: "/ops/tenants", title: "Tenants", desc: "Manage tenant leases, contacts, and communications.", module: "SiteSync Ops" },
