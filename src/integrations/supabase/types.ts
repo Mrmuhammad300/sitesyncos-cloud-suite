@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      budgets: {
+        Row: {
+          allocated: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fiscal_year: string | null
+          id: string
+          project_id: string | null
+          spent: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allocated?: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fiscal_year?: string | null
+          id?: string
+          project_id?: string | null
+          spent?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allocated?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fiscal_year?: string | null
+          id?: string
+          project_id?: string | null
+          spent?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       change_orders: {
         Row: {
           amount: number
@@ -131,6 +181,115 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "daily_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          doc_number: string
+          doc_type: string
+          file_size: string | null
+          file_url: string | null
+          id: string
+          project_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          doc_number: string
+          doc_type?: string
+          file_size?: string | null
+          file_url?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          doc_number?: string
+          doc_type?: string
+          file_size?: string | null
+          file_url?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draw_requests: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          created_at: string
+          description: string | null
+          draw_number: string
+          id: string
+          project_id: string | null
+          requested_by: string | null
+          status: string
+          submitted_date: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          approved_by?: string | null
+          created_at?: string
+          description?: string | null
+          draw_number: string
+          id?: string
+          project_id?: string | null
+          requested_by?: string | null
+          status?: string
+          submitted_date?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          created_at?: string
+          description?: string | null
+          draw_number?: string
+          id?: string
+          project_id?: string | null
+          requested_by?: string | null
+          status?: string
+          submitted_date?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draw_requests_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -334,6 +493,54 @@ export type Database = {
           },
         ]
       }
+      tenants: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          lease_end: string | null
+          lease_start: string | null
+          monthly_rent: number
+          notes: string | null
+          property_name: string
+          status: string
+          tenant_name: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          lease_end?: string | null
+          lease_start?: string | null
+          monthly_rent?: number
+          notes?: string | null
+          property_name: string
+          status?: string
+          tenant_name: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          lease_end?: string | null
+          lease_start?: string | null
+          monthly_rent?: number
+          notes?: string | null
+          property_name?: string
+          status?: string
+          tenant_name?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -349,6 +556,60 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      work_orders: {
+        Row: {
+          assigned_to: string | null
+          category: string | null
+          completed_date: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string
+          property_name: string | null
+          reported_by: string | null
+          status: string
+          title: string
+          unit: string | null
+          updated_at: string
+          wo_number: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          property_name?: string | null
+          reported_by?: string | null
+          status?: string
+          title: string
+          unit?: string | null
+          updated_at?: string
+          wo_number: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          property_name?: string | null
+          reported_by?: string | null
+          status?: string
+          title?: string
+          unit?: string | null
+          updated_at?: string
+          wo_number?: string
         }
         Relationships: []
       }
