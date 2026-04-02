@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, DollarSign, HardHat, TrendingUp, AlertTriangle, CheckCircle2,
-  Clock, ArrowUpRight, ArrowDownRight, FileText, Users, Activity
+  Clock, ArrowUpRight, ArrowDownRight, FileText, Users, Activity, Brain, Sparkles
 } from "lucide-react";
+import { AiInsightCard } from "@/components/AiInsightCard";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
 
 const kpis = [
