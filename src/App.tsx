@@ -20,17 +20,17 @@ import PropertiesPage from "@/pages/vault/PropertiesPage";
 import ROICalculatorPage from "@/pages/vault/ROICalculatorPage";
 import LenderPortalPage from "@/pages/vault/LenderPortalPage";
 import TreasuryPage from "@/pages/treasury/TreasuryPage";
+import BudgetsPage from "@/pages/ops/BudgetsPage";
+import DrawRequestsPage from "@/pages/ops/DrawRequestsPage";
+import TenantsPage from "@/pages/ops/TenantsPage";
+import WorkOrdersPage from "@/pages/ops/WorkOrdersPage";
+import DocumentsPage from "@/pages/ops/DocumentsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const stubModules = [
   { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
-  { path: "/ops/draws", title: "Draw Requests", desc: "Submit and approve draw requests with workflows.", module: "SiteSync Ops" },
-  { path: "/ops/tenants", title: "Tenants", desc: "Manage tenant leases, contacts, and communications.", module: "SiteSync Ops" },
-  { path: "/ops/work-orders", title: "Work Orders", desc: "Create and track maintenance work orders.", module: "SiteSync Ops" },
-  { path: "/ops/documents", title: "Documents", desc: "Document management with versioning and search.", module: "SiteSync Ops" },
   { path: "/ai/agents", title: "AI Agents", desc: "Multi-agent orchestration for risk, cost, and compliance.", module: "AI & Intelligence" },
   { path: "/ai/analytics", title: "Analytics", desc: "AI-powered analytics and insights dashboard.", module: "AI & Intelligence" },
   { path: "/ai/simulator", title: "Scenario Simulator", desc: "Run what-if scenarios for cost and schedule.", module: "AI & Intelligence" },
@@ -55,18 +55,28 @@ const App = () => (
                 <AppLayout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
+                    {/* Vault */}
                     <Route path="/vault/properties" element={<PropertiesPage />} />
                     <Route path="/vault/roi" element={<ROICalculatorPage />} />
                     <Route path="/vault/lender" element={<LenderPortalPage />} />
+                    {/* Build */}
                     <Route path="/build/projects" element={<ProjectsPage />} />
                     <Route path="/build/rfis" element={<RFIsPage />} />
                     <Route path="/build/submittals" element={<SubmittalsPage />} />
                     <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
                     <Route path="/build/daily-reports" element={<DailyReportsPage />} />
                     <Route path="/build/schedule" element={<SchedulePage />} />
+                    {/* Ops */}
+                    <Route path="/ops/budgets" element={<BudgetsPage />} />
+                    <Route path="/ops/draws" element={<DrawRequestsPage />} />
+                    <Route path="/ops/tenants" element={<TenantsPage />} />
+                    <Route path="/ops/work-orders" element={<WorkOrdersPage />} />
+                    <Route path="/ops/documents" element={<DocumentsPage />} />
+                    {/* Treasury */}
                     <Route path="/treasury/ledger" element={<TreasuryPage />} />
                     <Route path="/treasury/milestones" element={<TreasuryPage />} />
                     <Route path="/treasury/approvals" element={<TreasuryPage />} />
+                    {/* Stubs */}
                     {stubModules.map((m) => (
                       <Route key={m.path} path={m.path} element={<ModulePage title={m.title} description={m.desc} module={m.module} />} />
                     ))}
