@@ -31,6 +31,11 @@ const DocumentsPage = lazy(() => import("@/pages/ops/DocumentsPage"));
 const AgentsPage = lazy(() => import("@/pages/ai/AgentsPage"));
 const AnalyticsPage = lazy(() => import("@/pages/ai/AnalyticsPage"));
 const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
+const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
+const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
+const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
+const SettingsPage = lazy(() => import("@/pages/system/SettingsPage"));
+const CompliancePage = lazy(() => import("@/pages/vault/CompliancePage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -41,13 +46,7 @@ const Loading = () => (
   </div>
 );
 
-const stubModules = [
-  { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/spatial/viewer", title: "3D Viewer", desc: "Interactive 3D building models and visualization.", module: "Spatial Workbench" },
-  { path: "/spatial/plans", title: "Floor Plans", desc: "Generate and view parametric floor plans.", module: "Spatial Workbench" },
-  { path: "/notifications", title: "Notifications", desc: "View all system notifications and alerts.", module: "System" },
-  { path: "/settings", title: "Settings", desc: "Platform configuration and user preferences.", module: "System" },
-];
+const stubModules: { path: string; title: string; desc: string; module: string }[] = [];
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -91,7 +90,15 @@ const App = () => (
                         <Route path="/ai/agents" element={<AgentsPage />} />
                         <Route path="/ai/analytics" element={<AnalyticsPage />} />
                         <Route path="/ai/simulator" element={<SimulatorPage />} />
-                        {/* Stubs */}
+                        {/* Spatial */}
+                        <Route path="/spatial/viewer" element={<ViewerPage />} />
+                        <Route path="/spatial/plans" element={<FloorPlansPage />} />
+                        {/* System */}
+                        <Route path="/notifications" element={<NotificationsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        {/* Vault extras */}
+                        <Route path="/vault/compliance" element={<CompliancePage />} />
+                        {/* Stubs (none remaining) */}
                         {stubModules.map((m) => (
                           <Route key={m.path} path={m.path} element={<ModulePage title={m.title} description={m.desc} module={m.module} />} />
                         ))}
