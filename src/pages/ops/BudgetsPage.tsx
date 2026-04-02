@@ -75,6 +75,13 @@ const BudgetsPage = () => {
         <div className="flex gap-2 flex-wrap">{filters.map((f) => (<Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>{f}</Button>))}</div>
       </div>
 
+      <AiInsightCard
+        type="budget-monitor"
+        title="Quantum Ledger — Budget Analysis"
+        agentName="Quantum Ledger"
+        icon={<Sparkles className="h-4 w-4 text-accent" />}
+      />
+
       <Card><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
           <Table>
