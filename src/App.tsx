@@ -57,6 +57,10 @@ const App = () => (
                 <Route path="/vault/roi" element={<ROICalculatorPage />} />
                 <Route path="/vault/lender" element={<LenderPortalPage />} />
                 <Route path="/build/projects" element={<ProjectsPage />} />
+                <Route path="/build/rfis" element={<RFIsPage />} />
+                <Route path="/build/submittals" element={<SubmittalsPage />} />
+                <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
+                <Route path="/build/daily-reports" element={<DailyReportsPage />} />
                 <Route path="/build/schedule" element={<SchedulePage />} />
                 <Route path="/treasury/ledger" element={<TreasuryPage />} />
                 <Route path="/treasury/milestones" element={<TreasuryPage />} />
