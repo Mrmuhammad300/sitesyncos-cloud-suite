@@ -14,6 +14,263 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_decisions: {
+        Row: {
+          agent_id: string
+          confidence: number | null
+          created_at: string
+          decision: Json
+          decision_type: string
+          execution_id: string
+          id: string
+          policy_violations: string[] | null
+          requires_human: boolean | null
+          risk_flags: string[] | null
+        }
+        Insert: {
+          agent_id: string
+          confidence?: number | null
+          created_at?: string
+          decision?: Json
+          decision_type: string
+          execution_id: string
+          id?: string
+          policy_violations?: string[] | null
+          requires_human?: boolean | null
+          risk_flags?: string[] | null
+        }
+        Update: {
+          agent_id?: string
+          confidence?: number | null
+          created_at?: string
+          decision?: Json
+          decision_type?: string
+          execution_id?: string
+          id?: string
+          policy_violations?: string[] | null
+          requires_human?: boolean | null
+          risk_flags?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_decisions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["agent_id"]
+          },
+        ]
+      }
+      agent_executions: {
+        Row: {
+          agent_id: string
+          approval_feedback: string | null
+          approval_status: string | null
+          approved_by: string | null
+          confidence_score: number | null
+          created_at: string
+          duration_ms: number | null
+          escalated_to: string | null
+          event_type: string
+          execution_id: string
+          id: string
+          input_data: Json | null
+          output_data: Json | null
+          pipeline_id: string | null
+          pipeline_position: number | null
+          reasoning: string | null
+          requires_approval: boolean | null
+          risk_flags: string[] | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          approval_feedback?: string | null
+          approval_status?: string | null
+          approved_by?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          escalated_to?: string | null
+          event_type: string
+          execution_id: string
+          id?: string
+          input_data?: Json | null
+          output_data?: Json | null
+          pipeline_id?: string | null
+          pipeline_position?: number | null
+          reasoning?: string | null
+          requires_approval?: boolean | null
+          risk_flags?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          approval_feedback?: string | null
+          approval_status?: string | null
+          approved_by?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          escalated_to?: string | null
+          event_type?: string
+          execution_id?: string
+          id?: string
+          input_data?: Json | null
+          output_data?: Json | null
+          pipeline_id?: string | null
+          pipeline_position?: number | null
+          reasoning?: string | null
+          requires_approval?: boolean | null
+          risk_flags?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_executions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["agent_id"]
+          },
+        ]
+      }
+      agent_learning_signals: {
+        Row: {
+          agent_id: string
+          created_at: string
+          created_by: string | null
+          execution_id: string
+          feedback: string | null
+          id: string
+          is_positive: boolean
+          signal_type: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          created_by?: string | null
+          execution_id: string
+          feedback?: string | null
+          id?: string
+          is_positive?: boolean
+          signal_type?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          created_by?: string | null
+          execution_id?: string
+          feedback?: string | null
+          id?: string
+          is_positive?: boolean
+          signal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_learning_signals_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["agent_id"]
+          },
+        ]
+      }
+      agent_memory: {
+        Row: {
+          access_count: number | null
+          created_at: string
+          id: string
+          importance: number | null
+          key: string
+          last_accessed: string | null
+          memory_type: string
+          project_id: string | null
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          access_count?: number | null
+          created_at?: string
+          id?: string
+          importance?: number | null
+          key: string
+          last_accessed?: string | null
+          memory_type?: string
+          project_id?: string | null
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          access_count?: number | null
+          created_at?: string
+          id?: string
+          importance?: number | null
+          key?: string
+          last_accessed?: string | null
+          memory_type?: string
+          project_id?: string | null
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memory_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          agent_id: string
+          agent_type: string
+          autonomy_level: string
+          configuration: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          metrics: Json | null
+          name: string
+          routing_logic: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          agent_type: string
+          autonomy_level?: string
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metrics?: Json | null
+          name: string
+          routing_logic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_type?: string
+          autonomy_level?: string
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metrics?: Json | null
+          name?: string
+          routing_logic?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       budgets: {
         Row: {
           allocated: number
@@ -291,6 +548,42 @@ export type Database = {
           },
         ]
       }
+      domain_state_machines: {
+        Row: {
+          created_at: string
+          domain: string
+          guards: Json
+          id: string
+          initial_state: string
+          states: string[]
+          terminal_states: string[] | null
+          transitions: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          guards?: Json
+          id?: string
+          initial_state: string
+          states?: string[]
+          terminal_states?: string[] | null
+          transitions?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          guards?: Json
+          id?: string
+          initial_state?: string
+          states?: string[]
+          terminal_states?: string[] | null
+          transitions?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       draw_requests: {
         Row: {
           amount: number
@@ -343,6 +636,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      event_agent_bindings: {
+        Row: {
+          autonomy_level: string
+          block_on_risk_flag: boolean | null
+          configuration: Json | null
+          created_at: string
+          event_type: string
+          final_output_key: string | null
+          hard_blocks: string[] | null
+          id: string
+          min_confidence: number | null
+          pipeline_agents: string[]
+          requires_audit: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          autonomy_level?: string
+          block_on_risk_flag?: boolean | null
+          configuration?: Json | null
+          created_at?: string
+          event_type: string
+          final_output_key?: string | null
+          hard_blocks?: string[] | null
+          id?: string
+          min_confidence?: number | null
+          pipeline_agents?: string[]
+          requires_audit?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          autonomy_level?: string
+          block_on_risk_flag?: boolean | null
+          configuration?: Json | null
+          created_at?: string
+          event_type?: string
+          final_output_key?: string | null
+          hard_blocks?: string[] | null
+          id?: string
+          min_confidence?: number | null
+          pipeline_agents?: string[]
+          requires_audit?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       lenders: {
         Row: {
