@@ -34,6 +34,7 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-tooltip",
             "@radix-ui/react-popover",
           ],
+          "vendor-three": ["three", "@react-three/fiber", "@react-three/drei"],
         },
       },
     },
