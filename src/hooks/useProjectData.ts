@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 // Projects
@@ -24,6 +24,19 @@ export function useCreateProject() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Project created"); },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"projects"> & { id: string }) => {
+      const { data, error } = await supabase.from("projects").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Project updated"); },
     onError: (e) => toast.error(e.message),
   });
 }
@@ -53,6 +66,19 @@ export function useCreateRFI() {
   });
 }
 
+export function useUpdateRFI() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"rfis"> & { id: string }) => {
+      const { data, error } = await supabase.from("rfis").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfis"] }); toast.success("RFI updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
 // Submittals
 export function useSubmittals() {
   return useQuery({
@@ -74,6 +100,19 @@ export function useCreateSubmittal() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["submittals"] }); toast.success("Submittal created"); },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
+export function useUpdateSubmittal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"submittals"> & { id: string }) => {
+      const { data, error } = await supabase.from("submittals").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["submittals"] }); toast.success("Submittal updated"); },
     onError: (e) => toast.error(e.message),
   });
 }
@@ -103,6 +142,19 @@ export function useCreateChangeOrder() {
   });
 }
 
+export function useUpdateChangeOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"change_orders"> & { id: string }) => {
+      const { data, error } = await supabase.from("change_orders").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["change_orders"] }); toast.success("Change order updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
 // Daily Reports
 export function useDailyReports() {
   return useQuery({
@@ -124,6 +176,19 @@ export function useCreateDailyReport() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["daily_reports"] }); toast.success("Report submitted"); },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
+export function useUpdateDailyReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"daily_reports"> & { id: string }) => {
+      const { data, error } = await supabase.from("daily_reports").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["daily_reports"] }); toast.success("Report updated"); },
     onError: (e) => toast.error(e.message),
   });
 }
