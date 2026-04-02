@@ -344,6 +344,59 @@ export type Database = {
           },
         ]
       }
+      lenders: {
+        Row: {
+          commitment: number
+          compliance_score: number | null
+          created_at: string
+          drawn: number
+          id: string
+          loan_type: string
+          maturity: string | null
+          name: string
+          project_id: string | null
+          rate: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commitment?: number
+          compliance_score?: number | null
+          created_at?: string
+          drawn?: number
+          id?: string
+          loan_type?: string
+          maturity?: string | null
+          name: string
+          project_id?: string | null
+          rate?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commitment?: number
+          compliance_score?: number | null
+          created_at?: string
+          drawn?: number
+          id?: string
+          loan_type?: string
+          maturity?: string | null
+          name?: string
+          project_id?: string | null
+          rate?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lenders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -425,6 +478,60 @@ export type Database = {
           status?: string
           team_size?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string | null
+          cap_rate: number | null
+          created_at: string
+          id: string
+          irr: number | null
+          name: string
+          noi: number | null
+          occupancy: number | null
+          price: number
+          property_type: string
+          sqft: number
+          status: string
+          units: number | null
+          updated_at: string
+          year_built: number | null
+        }
+        Insert: {
+          address?: string | null
+          cap_rate?: number | null
+          created_at?: string
+          id?: string
+          irr?: number | null
+          name: string
+          noi?: number | null
+          occupancy?: number | null
+          price?: number
+          property_type?: string
+          sqft?: number
+          status?: string
+          units?: number | null
+          updated_at?: string
+          year_built?: number | null
+        }
+        Update: {
+          address?: string | null
+          cap_rate?: number | null
+          created_at?: string
+          id?: string
+          irr?: number | null
+          name?: string
+          noi?: number | null
+          occupancy?: number | null
+          price?: number
+          property_type?: string
+          sqft?: number
+          status?: string
+          units?: number | null
+          updated_at?: string
+          year_built?: number | null
         }
         Relationships: []
       }
@@ -584,6 +691,54 @@ export type Database = {
           status?: string
           tenant_name?: string
           unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      treasury_transactions: {
+        Row: {
+          account: string
+          created_at: string
+          credit: number | null
+          debit: number | null
+          description: string
+          id: string
+          project_name: string | null
+          requestor: string | null
+          status: string
+          txn_date: string
+          txn_number: string
+          txn_type: string
+          updated_at: string
+        }
+        Insert: {
+          account?: string
+          created_at?: string
+          credit?: number | null
+          debit?: number | null
+          description: string
+          id?: string
+          project_name?: string | null
+          requestor?: string | null
+          status?: string
+          txn_date?: string
+          txn_number: string
+          txn_type?: string
+          updated_at?: string
+        }
+        Update: {
+          account?: string
+          created_at?: string
+          credit?: number | null
+          debit?: number | null
+          description?: string
+          id?: string
+          project_name?: string | null
+          requestor?: string | null
+          status?: string
+          txn_date?: string
+          txn_number?: string
+          txn_type?: string
           updated_at?: string
         }
         Relationships: []
