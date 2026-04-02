@@ -14,16 +14,369 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      change_orders: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          category: string | null
+          co_number: string
+          created_at: string
+          days_impact: number
+          id: string
+          project_id: string | null
+          reason: string | null
+          requested_by: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          approved_by?: string | null
+          category?: string | null
+          co_number: string
+          created_at?: string
+          days_impact?: number
+          id?: string
+          project_id?: string | null
+          reason?: string | null
+          requested_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          category?: string | null
+          co_number?: string
+          created_at?: string
+          days_impact?: number
+          id?: string
+          project_id?: string | null
+          reason?: string | null
+          requested_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "change_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_reports: {
+        Row: {
+          activities: string[] | null
+          author_name: string | null
+          author_user: string | null
+          created_at: string
+          crew_count: number
+          delay_hours: number
+          id: string
+          project_id: string | null
+          report_date: string
+          report_number: string
+          safety_incidents: number
+          summary: string | null
+          temp_high: number | null
+          temp_low: number | null
+          updated_at: string
+          weather: string | null
+          work_hours: number
+        }
+        Insert: {
+          activities?: string[] | null
+          author_name?: string | null
+          author_user?: string | null
+          created_at?: string
+          crew_count?: number
+          delay_hours?: number
+          id?: string
+          project_id?: string | null
+          report_date?: string
+          report_number: string
+          safety_incidents?: number
+          summary?: string | null
+          temp_high?: number | null
+          temp_low?: number | null
+          updated_at?: string
+          weather?: string | null
+          work_hours?: number
+        }
+        Update: {
+          activities?: string[] | null
+          author_name?: string | null
+          author_user?: string | null
+          created_at?: string
+          crew_count?: number
+          delay_hours?: number
+          id?: string
+          project_id?: string | null
+          report_date?: string
+          report_number?: string
+          safety_incidents?: number
+          summary?: string | null
+          temp_high?: number | null
+          temp_low?: number | null
+          updated_at?: string
+          weather?: string | null
+          work_hours?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          budget: number
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          name: string
+          phase: string | null
+          progress: number
+          project_manager: string | null
+          spent: number
+          start_date: string | null
+          status: string
+          team_size: number
+          updated_at: string
+        }
+        Insert: {
+          budget?: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          phase?: string | null
+          progress?: number
+          project_manager?: string | null
+          spent?: number
+          start_date?: string | null
+          status?: string
+          team_size?: number
+          updated_at?: string
+        }
+        Update: {
+          budget?: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          phase?: string | null
+          progress?: number
+          project_manager?: string | null
+          spent?: number
+          start_date?: string | null
+          status?: string
+          team_size?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rfis: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by_user: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string
+          project_id: string | null
+          rfi_number: string
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by_user?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          rfi_number: string
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by_user?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          rfi_number?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfis_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submittals: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          project_id: string | null
+          reviewer: string | null
+          revision: number
+          spec_section: string | null
+          status: string
+          submittal_number: string
+          submitted_by: string | null
+          submitted_date: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          project_id?: string | null
+          reviewer?: string | null
+          revision?: number
+          spec_section?: string | null
+          status?: string
+          submittal_number: string
+          submitted_by?: string | null
+          submitted_date?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          project_id?: string | null
+          reviewer?: string | null
+          revision?: number
+          spec_section?: string | null
+          status?: string
+          submittal_number?: string
+          submitted_by?: string | null
+          submitted_date?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submittals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "super_admin"
+        | "admin"
+        | "project_manager"
+        | "superintendent"
+        | "architect"
+        | "engineer"
+        | "owner"
+        | "subcontractor"
+        | "lender"
+        | "field_staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +503,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "super_admin",
+        "admin",
+        "project_manager",
+        "superintendent",
+        "architect",
+        "engineer",
+        "owner",
+        "subcontractor",
+        "lender",
+        "field_staff",
+      ],
+    },
   },
 } as const

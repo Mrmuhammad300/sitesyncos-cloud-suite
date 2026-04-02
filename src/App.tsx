@@ -9,6 +9,10 @@ import ModulePage from "@/pages/ModulePage";
 import LoginPage from "@/pages/auth/LoginPage";
 import ProjectsPage from "@/pages/build/ProjectsPage";
 import SchedulePage from "@/pages/build/SchedulePage";
+import RFIsPage from "@/pages/build/RFIsPage";
+import SubmittalsPage from "@/pages/build/SubmittalsPage";
+import ChangeOrdersPage from "@/pages/build/ChangeOrdersPage";
+import DailyReportsPage from "@/pages/build/DailyReportsPage";
 import PropertiesPage from "@/pages/vault/PropertiesPage";
 import ROICalculatorPage from "@/pages/vault/ROICalculatorPage";
 import LenderPortalPage from "@/pages/vault/LenderPortalPage";
@@ -19,10 +23,7 @@ const queryClient = new QueryClient();
 
 const stubModules = [
   { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/build/rfis", title: "RFIs", desc: "Track requests for information across all projects.", module: "SiteSync Build" },
-  { path: "/build/submittals", title: "Submittals", desc: "Manage submittal workflows and approvals.", module: "SiteSync Build" },
-  { path: "/build/change-orders", title: "Change Orders", desc: "Process and track construction change orders.", module: "SiteSync Build" },
-  { path: "/build/daily-reports", title: "Daily Reports", desc: "Field reports, weather logs, and crew tracking.", module: "SiteSync Build" },
+  { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/budgets", title: "Budgets", desc: "Create and manage project and operational budgets.", module: "SiteSync Ops" },
   { path: "/ops/draws", title: "Draw Requests", desc: "Submit and approve draw requests with workflows.", module: "SiteSync Ops" },
   { path: "/ops/tenants", title: "Tenants", desc: "Manage tenant leases, contacts, and communications.", module: "SiteSync Ops" },
@@ -53,6 +54,10 @@ const App = () => (
                 <Route path="/vault/roi" element={<ROICalculatorPage />} />
                 <Route path="/vault/lender" element={<LenderPortalPage />} />
                 <Route path="/build/projects" element={<ProjectsPage />} />
+                <Route path="/build/rfis" element={<RFIsPage />} />
+                <Route path="/build/submittals" element={<SubmittalsPage />} />
+                <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
+                <Route path="/build/daily-reports" element={<DailyReportsPage />} />
                 <Route path="/build/schedule" element={<SchedulePage />} />
                 <Route path="/treasury/ledger" element={<TreasuryPage />} />
                 <Route path="/treasury/milestones" element={<TreasuryPage />} />
