@@ -28,6 +28,9 @@ const DrawRequestsPage = lazy(() => import("@/pages/ops/DrawRequestsPage"));
 const TenantsPage = lazy(() => import("@/pages/ops/TenantsPage"));
 const WorkOrdersPage = lazy(() => import("@/pages/ops/WorkOrdersPage"));
 const DocumentsPage = lazy(() => import("@/pages/ops/DocumentsPage"));
+const AgentsPage = lazy(() => import("@/pages/ai/AgentsPage"));
+const AnalyticsPage = lazy(() => import("@/pages/ai/AnalyticsPage"));
+const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -40,9 +43,6 @@ const Loading = () => (
 
 const stubModules = [
   { path: "/vault/compliance", title: "Compliance", desc: "Track regulatory compliance and documentation.", module: "SiteSync Vault" },
-  { path: "/ai/agents", title: "AI Agents", desc: "Multi-agent orchestration for risk, cost, and compliance.", module: "AI & Intelligence" },
-  { path: "/ai/analytics", title: "Analytics", desc: "AI-powered analytics and insights dashboard.", module: "AI & Intelligence" },
-  { path: "/ai/simulator", title: "Scenario Simulator", desc: "Run what-if scenarios for cost and schedule.", module: "AI & Intelligence" },
   { path: "/spatial/viewer", title: "3D Viewer", desc: "Interactive 3D building models and visualization.", module: "Spatial Workbench" },
   { path: "/spatial/plans", title: "Floor Plans", desc: "Generate and view parametric floor plans.", module: "Spatial Workbench" },
   { path: "/notifications", title: "Notifications", desc: "View all system notifications and alerts.", module: "System" },
@@ -87,6 +87,10 @@ const App = () => (
                         <Route path="/treasury/ledger" element={<TreasuryPage />} />
                         <Route path="/treasury/milestones" element={<TreasuryPage />} />
                         <Route path="/treasury/approvals" element={<TreasuryPage />} />
+                        {/* AI & Intelligence */}
+                        <Route path="/ai/agents" element={<AgentsPage />} />
+                        <Route path="/ai/analytics" element={<AnalyticsPage />} />
+                        <Route path="/ai/simulator" element={<SimulatorPage />} />
                         {/* Stubs */}
                         {stubModules.map((m) => (
                           <Route key={m.path} path={m.path} element={<ModulePage title={m.title} description={m.desc} module={m.module} />} />
