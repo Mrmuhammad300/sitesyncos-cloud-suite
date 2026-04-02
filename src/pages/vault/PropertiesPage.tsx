@@ -1,50 +1,15 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Building2, Search, Plus, MapPin, DollarSign, TrendingUp, Percent,
-  Calendar, Eye, BarChart3, ArrowUpRight, ArrowDownRight
-} from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, MapPin, Eye, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
-
-interface Property {
-  id: string;
-  name: string;
-  address: string;
-  type: string;
-  status: "Active" | "Under Contract" | "Due Diligence" | "Closed" | "Pipeline";
-  price: string;
-  priceNum: number;
-  sqft: string;
-  capRate: string;
-  noi: string;
-  irr: string;
-  yearBuilt: number;
-  units: number;
-  occupancy: string;
-}
-
-const properties: Property[] = [
-  { id: "PROP-001", name: "Meridian Office Complex", address: "450 Market St, San Francisco", type: "Office", status: "Active", price: "$28,500,000", priceNum: 28500000, sqft: "185,000", capRate: "6.2%", noi: "$1,767,000", irr: "14.8%", yearBuilt: 2018, units: 0, occupancy: "92%" },
-  { id: "PROP-002", name: "Parkside Apartments", address: "2100 Oak Ave, Austin", type: "Multifamily", status: "Under Contract", price: "$15,200,000", priceNum: 15200000, sqft: "120,000", capRate: "5.8%", noi: "$881,600", irr: "16.2%", yearBuilt: 2020, units: 96, occupancy: "97%" },
-  { id: "PROP-003", name: "Gateway Retail Center", address: "8900 Highway 71, Denver", type: "Retail", status: "Due Diligence", price: "$9,800,000", priceNum: 9800000, sqft: "65,000", capRate: "7.1%", noi: "$695,800", irr: "12.4%", yearBuilt: 2015, units: 0, occupancy: "88%" },
-  { id: "PROP-004", name: "Industrial Hub East", address: "12 Logistics Way, Dallas", type: "Industrial", status: "Active", price: "$34,000,000", priceNum: 34000000, sqft: "250,000", capRate: "5.5%", noi: "$1,870,000", irr: "13.9%", yearBuilt: 2021, units: 0, occupancy: "100%" },
-  { id: "PROP-005", name: "Lakeview Condominiums", address: "55 Shoreline Dr, Chicago", type: "Multifamily", status: "Pipeline", price: "$22,000,000", priceNum: 22000000, sqft: "95,000", capRate: "5.2%", noi: "$1,144,000", irr: "15.1%", yearBuilt: 2019, units: 64, occupancy: "94%" },
-  { id: "PROP-006", name: "Riverside Medical Office", address: "300 Health Pkwy, Nashville", type: "Office", status: "Closed", price: "$12,400,000", priceNum: 12400000, sqft: "48,000", capRate: "6.8%", noi: "$843,200", irr: "11.7%", yearBuilt: 2017, units: 0, occupancy: "95%" },
-];
-
-const portfolioByType = [
-  { type: "Office", value: 40900000 },
-  { type: "Multifamily", value: 37200000 },
-  { type: "Industrial", value: 34000000 },
-  { type: "Retail", value: 9800000 },
-];
+import { useProperties, useCreateProperty, useUpdateProperty } from "@/hooks/useVaultData";
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success border-success/20",
@@ -55,17 +20,42 @@ const statusColor: Record<string, string> = {
 };
 
 export default function PropertiesPage() {
+  const { data: properties = [], isLoading } = useProperties();
+  const createProperty = useCreateProperty();
+  const updateProperty = useUpdateProperty();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [selected, setSelected] = useState<Property | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", address: "", property_type: "Office", status: "Active", price: "", sqft: "", cap_rate: "", noi: "", irr: "", year_built: "", units: "", occupancy: "" });
 
   const filtered = properties.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.address.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "all" || p.type === typeFilter;
-    return matchSearch && matchType;
+    const ms = p.name.toLowerCase().includes(search.toLowerCase()) || (p.address || "").toLowerCase().includes(search.toLowerCase());
+    const mt = typeFilter === "all" || p.property_type === typeFilter;
+    return ms && mt;
   });
 
-  const totalValue = properties.reduce((sum, p) => sum + p.priceNum, 0);
+  const totalValue = properties.reduce((s, p) => s + Number(p.price), 0);
+  const avgCap = properties.length ? properties.reduce((s, p) => s + Number(p.cap_rate || 0), 0) / properties.length : 0;
+  const avgOcc = properties.length ? properties.reduce((s, p) => s + Number(p.occupancy || 0), 0) / properties.length : 0;
+
+  const chartData = ["Office", "Multifamily", "Industrial", "Retail"].map(t => ({
+    type: t,
+    value: properties.filter(p => p.property_type === t).reduce((s, p) => s + Number(p.price), 0),
+  })).filter(d => d.value > 0);
+
+  const handleSubmit = () => {
+    createProperty.mutate({
+      name: form.name, address: form.address, property_type: form.property_type, status: form.status,
+      price: Number(form.price) || 0, sqft: Number(form.sqft) || 0, cap_rate: Number(form.cap_rate) || 0,
+      noi: Number(form.noi) || 0, irr: Number(form.irr) || 0, year_built: Number(form.year_built) || null,
+      units: Number(form.units) || 0, occupancy: Number(form.occupancy) || 0,
+    });
+    setOpen(false);
+    setForm({ name: "", address: "", property_type: "Office", status: "Active", price: "", sqft: "", cap_rate: "", noi: "", irr: "", year_built: "", units: "", occupancy: "" });
+  };
+
+  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -77,35 +67,33 @@ export default function PropertiesPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Manage your property portfolio and acquisition pipeline.</p>
         </div>
-        <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Add Property</Button>
+        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" /> Add Property</Button>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Portfolio Value</p><p className="text-xl font-bold">${(totalValue / 1e6).toFixed(1)}M</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Portfolio Value</p><p className="text-xl font-bold">{fmt(totalValue)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Properties</p><p className="text-xl font-bold">{properties.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Cap Rate</p><p className="text-xl font-bold">6.1%</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Occupancy</p><p className="text-xl font-bold">94.3%</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Cap Rate</p><p className="text-xl font-bold">{avgCap.toFixed(1)}%</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Occupancy</p><p className="text-xl font-bold">{avgOcc.toFixed(1)}%</p></CardContent></Card>
       </div>
 
-      {/* Chart + Filters */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Portfolio by Type</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={portfolioByType}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
-                <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" tickFormatter={(v) => `$${v / 1e6}M`} />
-                <ReTooltip formatter={(v: number) => [`$${(v / 1e6).toFixed(1)}M`, "Value"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="value" fill="hsl(221, 83%, 53%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {chartData.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-2"><CardTitle className="text-base">Portfolio by Type</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${v / 1e6}M`} />
+                  <ReTooltip formatter={(v: number) => [fmt(v), "Value"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="relative">
@@ -126,12 +114,11 @@ export default function PropertiesPage() {
         </Card>
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
+          {isLoading ? <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p> : (
+            <Table>
+              <TableHeader><TableRow>
                 <TableHead className="text-xs">Property</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs">Type</TableHead>
@@ -139,48 +126,97 @@ export default function PropertiesPage() {
                 <TableHead className="text-xs">Cap Rate</TableHead>
                 <TableHead className="text-xs">IRR</TableHead>
                 <TableHead className="text-xs w-[60px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((p) => (
-                <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelected(p)}>
-                  <TableCell>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{p.address}</p>
-                  </TableCell>
-                  <TableCell><Badge variant="outline" className={`text-[10px] ${statusColor[p.status]}`}>{p.status}</Badge></TableCell>
-                  <TableCell className="text-sm">{p.type}</TableCell>
-                  <TableCell className="text-sm font-medium">{p.price}</TableCell>
-                  <TableCell className="text-sm">{p.capRate}</TableCell>
-                  <TableCell className="text-sm font-medium text-success flex items-center gap-0.5"><ArrowUpRight className="h-3 w-3" />{p.irr}</TableCell>
-                  <TableCell><Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableRow></TableHeader>
+              <TableBody>
+                {filtered.map((p) => (
+                  <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelected(p)}>
+                    <TableCell>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{p.address || "—"}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Select value={p.status} onValueChange={v => { updateProperty.mutate({ id: p.id, status: v }); }} >
+                        <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0" onClick={e => e.stopPropagation()}>
+                          <Badge variant="outline" className={`text-[10px] ${statusColor[p.status] || ""}`}>{p.status}</Badge>
+                        </SelectTrigger>
+                        <SelectContent>{["Active","Under Contract","Due Diligence","Pipeline","Closed"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-sm">{p.property_type}</TableCell>
+                    <TableCell className="text-sm font-medium">{fmt(Number(p.price))}</TableCell>
+                    <TableCell className="text-sm">{Number(p.cap_rate).toFixed(1)}%</TableCell>
+                    <TableCell className="text-sm font-medium text-success flex items-center gap-0.5"><ArrowUpRight className="h-3 w-3" />{Number(p.irr).toFixed(1)}%</TableCell>
+                    <TableCell><Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); setSelected(p); }}><Eye className="h-4 w-4" /></Button></TableCell>
+                  </TableRow>
+                ))}
+                {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No properties found.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
+      {/* Detail Dialog */}
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
         <DialogContent className="max-w-lg">
           {selected && (
             <>
               <DialogHeader>
                 <DialogTitle>{selected.name}</DialogTitle>
-                <DialogDescription>{selected.address} · {selected.type}</DialogDescription>
+                <DialogDescription>{selected.address || "No address"} · {selected.property_type}</DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div><p className="text-xs text-muted-foreground">Price</p><p className="font-bold">{selected.price}</p></div>
-                <div><p className="text-xs text-muted-foreground">NOI</p><p className="font-bold">{selected.noi}</p></div>
-                <div><p className="text-xs text-muted-foreground">Cap Rate</p><p className="font-bold">{selected.capRate}</p></div>
-                <div><p className="text-xs text-muted-foreground">IRR</p><p className="font-bold text-success">{selected.irr}</p></div>
-                <div><p className="text-xs text-muted-foreground">Sq Ft</p><p className="font-bold">{selected.sqft}</p></div>
-                <div><p className="text-xs text-muted-foreground">Occupancy</p><p className="font-bold">{selected.occupancy}</p></div>
-                <div><p className="text-xs text-muted-foreground">Year Built</p><p className="font-bold">{selected.yearBuilt}</p></div>
-                {selected.units > 0 && <div><p className="text-xs text-muted-foreground">Units</p><p className="font-bold">{selected.units}</p></div>}
+                <div><p className="text-xs text-muted-foreground">Price</p><p className="font-bold">{fmt(Number(selected.price))}</p></div>
+                <div><p className="text-xs text-muted-foreground">NOI</p><p className="font-bold">{fmt(Number(selected.noi))}</p></div>
+                <div><p className="text-xs text-muted-foreground">Cap Rate</p><p className="font-bold">{Number(selected.cap_rate).toFixed(1)}%</p></div>
+                <div><p className="text-xs text-muted-foreground">IRR</p><p className="font-bold text-success">{Number(selected.irr).toFixed(1)}%</p></div>
+                <div><p className="text-xs text-muted-foreground">Sq Ft</p><p className="font-bold">{Number(selected.sqft).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Occupancy</p><p className="font-bold">{Number(selected.occupancy).toFixed(0)}%</p></div>
+                <div><p className="text-xs text-muted-foreground">Year Built</p><p className="font-bold">{selected.year_built || "—"}</p></div>
+                {Number(selected.units) > 0 && <div><p className="text-xs text-muted-foreground">Units</p><p className="font-bold">{selected.units}</p></div>}
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Property</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2 max-h-[60vh] overflow-y-auto">
+            <div><Label className="text-xs">Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><Label className="text-xs">Address</Label><Input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Type</Label>
+                <Select value={form.property_type} onValueChange={v => setForm(f => ({ ...f, property_type: v }))}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{["Office","Multifamily","Industrial","Retail"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">Status</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{["Active","Under Contract","Due Diligence","Pipeline","Closed"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Price</Label><Input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+              <div><Label className="text-xs">Sq Ft</Label><Input type="number" value={form.sqft} onChange={e => setForm(f => ({ ...f, sqft: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><Label className="text-xs">Cap Rate %</Label><Input type="number" value={form.cap_rate} onChange={e => setForm(f => ({ ...f, cap_rate: e.target.value }))} /></div>
+              <div><Label className="text-xs">NOI</Label><Input type="number" value={form.noi} onChange={e => setForm(f => ({ ...f, noi: e.target.value }))} /></div>
+              <div><Label className="text-xs">IRR %</Label><Input type="number" value={form.irr} onChange={e => setForm(f => ({ ...f, irr: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><Label className="text-xs">Year Built</Label><Input type="number" value={form.year_built} onChange={e => setForm(f => ({ ...f, year_built: e.target.value }))} /></div>
+              <div><Label className="text-xs">Units</Label><Input type="number" value={form.units} onChange={e => setForm(f => ({ ...f, units: e.target.value }))} /></div>
+              <div><Label className="text-xs">Occupancy %</Label><Input type="number" value={form.occupancy} onChange={e => setForm(f => ({ ...f, occupancy: e.target.value }))} /></div>
+            </div>
+            <Button className="w-full" onClick={handleSubmit} disabled={!form.name}>Add Property</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

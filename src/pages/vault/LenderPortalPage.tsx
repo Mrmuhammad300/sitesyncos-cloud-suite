@@ -1,37 +1,39 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Landmark, FileCheck, AlertTriangle, CheckCircle2, Clock, Upload, Eye } from "lucide-react";
-
-const lenders = [
-  { id: "L-001", name: "First National Bank", type: "Senior Debt", commitment: "$18,500,000", drawn: "$12,950,000", rate: "SOFR + 225", maturity: "2026-09-15", status: "Active", compliance: 94 },
-  { id: "L-002", name: "Pacific Capital Partners", type: "Mezzanine", commitment: "$5,000,000", drawn: "$5,000,000", rate: "12.5% Fixed", maturity: "2027-03-01", status: "Active", compliance: 100 },
-  { id: "L-003", name: "Regional Credit Union", type: "Construction", commitment: "$24,000,000", drawn: "$8,400,000", rate: "SOFR + 300", maturity: "2026-12-31", status: "Active", compliance: 87 },
-  { id: "L-004", name: "Silverstone Capital", type: "Bridge", commitment: "$7,200,000", drawn: "$7,200,000", rate: "10.0% Fixed", maturity: "2025-06-30", status: "Maturing", compliance: 92 },
-];
-
-const covenants = [
-  { name: "Debt Service Coverage Ratio", required: "≥ 1.25x", actual: "1.42x", status: "pass" },
-  { name: "Loan-to-Value", required: "≤ 75%", actual: "68%", status: "pass" },
-  { name: "Minimum Occupancy", required: "≥ 85%", actual: "82%", status: "warning" },
-  { name: "Interest Reserve", required: "≥ 6 months", actual: "8 months", status: "pass" },
-  { name: "Net Worth Requirement", required: "≥ $10M", actual: "$14.2M", status: "pass" },
-  { name: "Quarterly Reporting", required: "By 45th day", actual: "Filed Day 38", status: "pass" },
-];
-
-const documents = [
-  { name: "Q4 2024 Financial Statements", type: "Financial Report", date: "2025-01-28", status: "Submitted" },
-  { name: "Insurance Certificate Renewal", type: "Insurance", date: "2025-01-15", status: "Approved" },
-  { name: "Environmental Phase I", type: "Environmental", date: "2024-11-20", status: "Approved" },
-  { name: "Appraisal Report - Skyline Tower", type: "Appraisal", date: "2024-10-05", status: "Under Review" },
-  { name: "Title Commitment", type: "Legal", date: "2024-09-18", status: "Approved" },
-];
+import { Plus, Upload } from "lucide-react";
+import { useLenders, useCreateLender, useUpdateLender } from "@/hooks/useVaultData";
 
 export default function LenderPortalPage() {
+  const { data: lenders = [], isLoading } = useLenders();
+  const create = useCreateLender();
+  const update = useUpdateLender();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", loan_type: "Senior Debt", commitment: "", drawn: "", rate: "", maturity: "", status: "Active", compliance_score: "100" });
+
+  const totalCommitment = lenders.reduce((s, l) => s + Number(l.commitment), 0);
+  const totalDrawn = lenders.reduce((s, l) => s + Number(l.drawn), 0);
+  const avgCompliance = lenders.length ? Math.round(lenders.reduce((s, l) => s + (l.compliance_score || 0), 0) / lenders.length) : 0;
+
+  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+
+  const handleSubmit = () => {
+    create.mutate({
+      name: form.name, loan_type: form.loan_type, commitment: Number(form.commitment) || 0,
+      drawn: Number(form.drawn) || 0, rate: form.rate, maturity: form.maturity || null,
+      status: form.status, compliance_score: Number(form.compliance_score) || 100,
+    });
+    setOpen(false);
+    setForm({ name: "", loan_type: "Senior Debt", commitment: "", drawn: "", rate: "", maturity: "", status: "Active", compliance_score: "100" });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -40,129 +42,85 @@ export default function LenderPortalPage() {
             <h1 className="text-2xl font-bold tracking-tight">Lender Portal</h1>
             <Badge variant="outline" className="text-[10px]">SiteSync Vault</Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage lender relationships, draws, and compliance tracking.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage lender relationships, draws, and compliance.</p>
         </div>
-        <Button size="sm"><Upload className="h-4 w-4 mr-1.5" /> Upload Document</Button>
+        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" /> Add Lender</Button>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Commitment</p><p className="text-xl font-bold">$54.7M</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Drawn</p><p className="text-xl font-bold">$33.6M</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available</p><p className="text-xl font-bold text-success">$21.1M</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Compliance</p><p className="text-xl font-bold">93%</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Commitment</p><p className="text-xl font-bold">{fmt(totalCommitment)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Drawn</p><p className="text-xl font-bold">{fmt(totalDrawn)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available</p><p className="text-xl font-bold text-success">{fmt(totalCommitment - totalDrawn)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Compliance</p><p className="text-xl font-bold">{avgCompliance}%</p></CardContent></Card>
       </div>
 
-      <Tabs defaultValue="lenders">
-        <TabsList>
-          <TabsTrigger value="lenders" className="text-xs">Lenders</TabsTrigger>
-          <TabsTrigger value="covenants" className="text-xs">Covenants</TabsTrigger>
-          <TabsTrigger value="documents" className="text-xs">Documents</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lenders" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Lender</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Commitment</TableHead>
-                    <TableHead className="text-xs">Drawn</TableHead>
-                    <TableHead className="text-xs">Rate</TableHead>
-                    <TableHead className="text-xs">Maturity</TableHead>
-                    <TableHead className="text-xs">Compliance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lenders.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell>
-                        <p className="text-sm font-medium">{l.name}</p>
+      <Card><CardContent className="p-0">
+        {isLoading ? <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p> : (
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead className="text-xs">Lender</TableHead>
+              <TableHead className="text-xs">Type</TableHead>
+              <TableHead className="text-xs">Commitment</TableHead>
+              <TableHead className="text-xs">Drawn</TableHead>
+              <TableHead className="text-xs">Rate</TableHead>
+              <TableHead className="text-xs">Maturity</TableHead>
+              <TableHead className="text-xs">Compliance</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {lenders.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell>
+                    <p className="text-sm font-medium">{l.name}</p>
+                    <Select value={l.status} onValueChange={v => update.mutate({ id: l.id, status: v })}>
+                      <SelectTrigger className="h-6 w-[90px] text-[10px] border-0 p-0">
                         <Badge variant="outline" className={`text-[10px] mt-0.5 ${l.status === "Maturing" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>{l.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{l.type}</TableCell>
-                      <TableCell className="text-sm font-medium">{l.commitment}</TableCell>
-                      <TableCell className="text-sm">{l.drawn}</TableCell>
-                      <TableCell className="text-xs font-mono">{l.rate}</TableCell>
-                      <TableCell className="text-sm">{l.maturity}</TableCell>
-                      <TableCell>
-                        <div className="w-16">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{l.compliance}%</p>
-                          <Progress value={l.compliance} className="h-1.5" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </SelectTrigger>
+                      <SelectContent>{["Active","Maturing","Closed"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-sm">{l.loan_type}</TableCell>
+                  <TableCell className="text-sm font-medium">{fmt(Number(l.commitment))}</TableCell>
+                  <TableCell className="text-sm">{fmt(Number(l.drawn))}</TableCell>
+                  <TableCell className="text-xs font-mono">{l.rate || "—"}</TableCell>
+                  <TableCell className="text-sm">{l.maturity || "—"}</TableCell>
+                  <TableCell>
+                    <div className="w-16">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">{l.compliance_score}%</p>
+                      <Progress value={l.compliance_score || 0} className="h-1.5" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {lenders.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No lenders yet.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
 
-        <TabsContent value="covenants" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Covenant</TableHead>
-                    <TableHead className="text-xs">Required</TableHead>
-                    <TableHead className="text-xs">Actual</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {covenants.map((c) => (
-                    <TableRow key={c.name}>
-                      <TableCell className="text-sm font-medium">{c.name}</TableCell>
-                      <TableCell className="text-sm font-mono">{c.required}</TableCell>
-                      <TableCell className="text-sm font-mono font-medium">{c.actual}</TableCell>
-                      <TableCell>
-                        {c.status === "pass" ? (
-                          <Badge variant="outline" className="text-[10px] bg-success/10 text-success"><CheckCircle2 className="h-3 w-3 mr-1" />Pass</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning"><AlertTriangle className="h-3 w-3 mr-1" />Warning</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="documents" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Document</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documents.map((d) => (
-                    <TableRow key={d.name}>
-                      <TableCell className="text-sm font-medium">{d.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{d.type}</TableCell>
-                      <TableCell className="text-sm">{d.date}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-[10px] ${d.status === "Approved" ? "bg-success/10 text-success" : d.status === "Submitted" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"}`}>{d.status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Lender</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div><Label className="text-xs">Lender Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><Label className="text-xs">Loan Type</Label>
+              <Select value={form.loan_type} onValueChange={v => setForm(f => ({ ...f, loan_type: v }))}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{["Senior Debt","Mezzanine","Construction","Bridge"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Commitment</Label><Input type="number" value={form.commitment} onChange={e => setForm(f => ({ ...f, commitment: e.target.value }))} /></div>
+              <div><Label className="text-xs">Drawn</Label><Input type="number" value={form.drawn} onChange={e => setForm(f => ({ ...f, drawn: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Rate</Label><Input value={form.rate} onChange={e => setForm(f => ({ ...f, rate: e.target.value }))} placeholder="e.g. SOFR + 225" /></div>
+              <div><Label className="text-xs">Maturity</Label><Input type="date" value={form.maturity} onChange={e => setForm(f => ({ ...f, maturity: e.target.value }))} /></div>
+            </div>
+            <div><Label className="text-xs">Compliance Score</Label><Input type="number" min="0" max="100" value={form.compliance_score} onChange={e => setForm(f => ({ ...f, compliance_score: e.target.value }))} /></div>
+            <Button className="w-full" onClick={handleSubmit} disabled={!form.name}>Add Lender</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
