@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, DollarSign, HardHat, TrendingUp, AlertTriangle, CheckCircle2,
-  Clock, ArrowUpRight, ArrowDownRight, FileText, Users, Activity
+  Clock, ArrowUpRight, ArrowDownRight, FileText, Users, Activity, Brain, Sparkles
 } from "lucide-react";
+import { AiInsightCard } from "@/components/AiInsightCard";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
 
 const kpis = [
@@ -157,6 +158,22 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* AI Insights Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AiInsightCard
+          type="project-health"
+          title="Project Health Assessment"
+          agentName="Binary Loom"
+          icon={<Brain className="h-4 w-4 text-primary" />}
+        />
+        <AiInsightCard
+          type="budget-monitor"
+          title="Budget Overrun Monitor"
+          agentName="Quantum Ledger"
+          icon={<Sparkles className="h-4 w-4 text-accent" />}
+        />
       </div>
 
       {/* Bottom Row */}

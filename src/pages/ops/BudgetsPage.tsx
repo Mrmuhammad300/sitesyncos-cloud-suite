@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart } from "lucide-react";
+import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart, Sparkles } from "lucide-react";
 import { useBudgets, useCreateBudget } from "@/hooks/useOpsData";
 import { useAuth } from "@/hooks/useAuth";
 import { Tables } from "@/integrations/supabase/types";
+import { AiInsightCard } from "@/components/AiInsightCard";
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success",
@@ -73,6 +74,13 @@ const BudgetsPage = () => {
         <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search budgets..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
         <div className="flex gap-2 flex-wrap">{filters.map((f) => (<Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>{f}</Button>))}</div>
       </div>
+
+      <AiInsightCard
+        type="budget-monitor"
+        title="Quantum Ledger — Budget Analysis"
+        agentName="Quantum Ledger"
+        icon={<Sparkles className="h-4 w-4 text-accent" />}
+      />
 
       <Card><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
