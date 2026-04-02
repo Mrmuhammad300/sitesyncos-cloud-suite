@@ -120,6 +120,53 @@ export type Database = {
           },
         ]
       }
+      compliance_items: {
+        Row: {
+          assignee: string | null
+          category: string
+          created_at: string
+          due_date: string | null
+          id: string
+          last_checked: string | null
+          project_id: string | null
+          requirement: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assignee?: string | null
+          category: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          last_checked?: string | null
+          project_id?: string | null
+          requirement: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assignee?: string | null
+          category?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          last_checked?: string | null
+          project_id?: string | null
+          requirement?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_reports: {
         Row: {
           activities: string[] | null
