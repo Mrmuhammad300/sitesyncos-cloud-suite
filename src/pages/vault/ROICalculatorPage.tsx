@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Percent, DollarSign, ArrowUpRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Percent, TrendingUp, DollarSign, ArrowUpRight, Building2 } from "lucide-react";
+import { useProperties } from "@/hooks/useVaultData";
 
 export default function ROICalculatorPage() {
+  const { data: properties, isLoading } = useProperties();
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("custom");
+
   const [purchasePrice, setPurchasePrice] = useState(10000000);
   const [noi, setNoi] = useState(650000);
   const [holdPeriod, setHoldPeriod] = useState(7);
@@ -18,13 +22,22 @@ export default function ROICalculatorPage() {
   const [loanToValue, setLoanToValue] = useState(70);
   const [interestRate, setInterestRate] = useState(5.5);
 
+  useEffect(() => {
+    if (selectedPropertyId === "custom" || !properties) return;
+    const prop = properties.find((p) => p.id === selectedPropertyId);
+    if (!prop) return;
+    setPurchasePrice(Number(prop.price) || 10000000);
+    setNoi(Number(prop.noi) || 650000);
+    if (prop.cap_rate && Number(prop.cap_rate) > 0) setExitCapRate(Number(prop.cap_rate));
+    if (prop.irr && Number(prop.irr) > 0) setDiscountRate(Number(prop.irr));
+  }, [selectedPropertyId, properties]);
+
   const capRate = ((noi / purchasePrice) * 100).toFixed(2);
   const equity = purchasePrice * (1 - loanToValue / 100);
   const loanAmount = purchasePrice * (loanToValue / 100);
   const annualDebtService = loanAmount * (interestRate / 100);
   const cashOnCash = (((noi - annualDebtService) / equity) * 100).toFixed(2);
 
-  // Simple NPV / IRR approximation
   const cashFlows: number[] = [-equity];
   let currentNoi = noi;
   for (let y = 1; y <= holdPeriod; y++) {
@@ -32,7 +45,7 @@ export default function ROICalculatorPage() {
     const cf = currentNoi - annualDebtService;
     if (y === holdPeriod) {
       const exitValue = currentNoi / (exitCapRate / 100);
-      const remainingLoan = loanAmount * 0.85; // simplified
+      const remainingLoan = loanAmount * 0.85;
       cashFlows.push(cf + exitValue - remainingLoan);
     } else {
       cashFlows.push(cf);
@@ -40,18 +53,17 @@ export default function ROICalculatorPage() {
   }
 
   const npv = cashFlows.reduce((sum, cf, i) => sum + cf / Math.pow(1 + discountRate / 100, i), 0);
-  const equityMultiple = (cashFlows.reduce((sum, cf, i) => i > 0 ? sum + cf : sum, 0) / equity).toFixed(2);
+  const equityMultiple = (cashFlows.reduce((sum, cf, i) => (i > 0 ? sum + cf : sum), 0) / equity).toFixed(2);
 
-  // Simple IRR approximation via bisection
   const calcNpvAtRate = (rate: number) => cashFlows.reduce((sum, cf, i) => sum + cf / Math.pow(1 + rate, i), 0);
   let lo = -0.5, hi = 1.0;
   for (let iter = 0; iter < 100; iter++) {
     const mid = (lo + hi) / 2;
     if (calcNpvAtRate(mid) > 0) lo = mid; else hi = mid;
   }
-  const irr = ((lo + hi) / 2 * 100).toFixed(1);
+  const irr = (((lo + hi) / 2) * 100).toFixed(1);
 
-  const fmt = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${(n / 1e3).toFixed(0)}K`;
+  const fmt = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${(n / 1e3).toFixed(0)}K`);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -62,10 +74,24 @@ export default function ROICalculatorPage() {
       <p className="text-sm text-muted-foreground -mt-4">Analyze investment returns with NPV, IRR, and Cap Rate models.</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Inputs */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3"><CardTitle className="text-base">Assumptions</CardTitle></CardHeader>
           <CardContent className="space-y-5">
+            {/* Property selector */}
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1"><Building2 className="h-3 w-3" />Load from Property</Label>
+              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Custom values" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom values</SelectItem>
+                  {isLoading && <SelectItem value="_loading" disabled>Loading…</SelectItem>}
+                  {properties?.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} — {p.property_type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
             <div className="space-y-2">
               <Label className="text-xs">Purchase Price</Label>
               <Input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(+e.target.value)} className="h-9" />
@@ -102,7 +128,6 @@ export default function ROICalculatorPage() {
           </CardContent>
         </Card>
 
-        {/* Results */}
         <div className="lg:col-span-2 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card><CardContent className="p-4 text-center"><Percent className="h-4 w-4 mx-auto mb-1 text-primary" /><p className="text-xl font-bold">{capRate}%</p><p className="text-[10px] text-muted-foreground">Going-In Cap Rate</p></CardContent></Card>
