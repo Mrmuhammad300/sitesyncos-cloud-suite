@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart } from "lucide-react";
+import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart, Sparkles } from "lucide-react";
 import { useBudgets, useCreateBudget } from "@/hooks/useOpsData";
 import { useAuth } from "@/hooks/useAuth";
 import { Tables } from "@/integrations/supabase/types";
+import { AiInsightCard } from "@/components/AiInsightCard";
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success",
