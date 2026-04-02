@@ -160,6 +160,22 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* AI Insights Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AiInsightCard
+          type="project-health"
+          title="Project Health Assessment"
+          agentName="Binary Loom"
+          icon={<Brain className="h-4 w-4 text-primary" />}
+        />
+        <AiInsightCard
+          type="budget-monitor"
+          title="Budget Overrun Monitor"
+          agentName="Quantum Ledger"
+          icon={<Sparkles className="h-4 w-4 text-accent" />}
+        />
+      </div>
+
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Active Projects Table */}
