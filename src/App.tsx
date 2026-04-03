@@ -31,6 +31,7 @@ const DocumentsPage = lazy(() => import("@/pages/ops/DocumentsPage"));
 const AgentsPage = lazy(() => import("@/pages/ai/AgentsPage"));
 const AnalyticsPage = lazy(() => import("@/pages/ai/AnalyticsPage"));
 const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
+const AIAssistantPage = lazy(() => import("@/pages/ai/AIAssistantPage"));
 const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
 const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
 const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
@@ -90,6 +91,7 @@ const App = () => (
                         <Route path="/ai/agents" element={<AgentsPage />} />
                         <Route path="/ai/analytics" element={<AnalyticsPage />} />
                         <Route path="/ai/simulator" element={<SimulatorPage />} />
+                        <Route path="/ai-assistant" element={<AIAssistantPage />} />
                         {/* Spatial */}
                         <Route path="/spatial/viewer" element={<ViewerPage />} />
                         <Route path="/spatial/plans" element={<FloorPlansPage />} />
