@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, MapPin, Eye, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import { useProperties, useCreateProperty, useUpdateProperty } from "@/hooks/useVaultData";
+import type { Database } from "@/integrations/supabase/types";
+
+type Property = Database["public"]["Tables"]["properties"]["Row"];
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success border-success/20",
@@ -25,7 +28,7 @@ export default function PropertiesPage() {
   const updateProperty = useUpdateProperty();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<Property | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", address: "", property_type: "Office", status: "Active", price: "", sqft: "", cap_rate: "", noi: "", irr: "", year_built: "", units: "", occupancy: "" });
 

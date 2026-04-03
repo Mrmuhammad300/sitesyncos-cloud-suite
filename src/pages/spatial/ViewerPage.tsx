@@ -117,7 +117,7 @@ function Scene({ layers }: { layers: LayerState[] }) {
 export default function ViewerPage() {
   const [selectedModel, setSelectedModel] = useState(mockModels[0].id);
   const [layers, setLayers] = useState(initialLayers);
-  const model = mockModels.find(m => m.id === selectedModel)!;
+  const model = mockModels.find(m => m.id === selectedModel) ?? mockModels[0];
 
   const toggleLayer = (i: number) => setLayers(prev => prev.map((l, idx) => idx === i ? { ...l, visible: !l.visible } : l));
 

@@ -1,6 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type PropertyInsert = Database["public"]["Tables"]["properties"]["Insert"];
+type PropertyUpdate = Database["public"]["Tables"]["properties"]["Update"] & { id: string };
+
+type LenderInsert = Database["public"]["Tables"]["lenders"]["Insert"];
+type LenderUpdate = Database["public"]["Tables"]["lenders"]["Update"] & { id: string };
+
+type TreasuryInsert = Database["public"]["Tables"]["treasury_transactions"]["Insert"];
+type TreasuryUpdate = Database["public"]["Tables"]["treasury_transactions"]["Update"] & { id: string };
 
 // Properties
 export function useProperties() {
@@ -17,26 +27,26 @@ export function useProperties() {
 export function useCreateProperty() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (p: any) => {
+    mutationFn: async (p: PropertyInsert) => {
       const { data, error } = await supabase.from("properties").insert(p).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["properties"] }); toast.success("Property added"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
 export function useUpdateProperty() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, ...updates }: PropertyUpdate) => {
       const { data, error } = await supabase.from("properties").update(updates).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["properties"] }); toast.success("Property updated"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -55,26 +65,26 @@ export function useLenders() {
 export function useCreateLender() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (l: any) => {
+    mutationFn: async (l: LenderInsert) => {
       const { data, error } = await supabase.from("lenders").insert(l).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["lenders"] }); toast.success("Lender added"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
 export function useUpdateLender() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, ...updates }: LenderUpdate) => {
       const { data, error } = await supabase.from("lenders").update(updates).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["lenders"] }); toast.success("Lender updated"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -93,25 +103,25 @@ export function useTreasuryTransactions() {
 export function useCreateTreasuryTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (t: any) => {
+    mutationFn: async (t: TreasuryInsert) => {
       const { data, error } = await supabase.from("treasury_transactions").insert(t).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["treasury_transactions"] }); toast.success("Transaction created"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
 export function useUpdateTreasuryTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, ...updates }: TreasuryUpdate) => {
       const { data, error } = await supabase.from("treasury_transactions").update(updates).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["treasury_transactions"] }); toast.success("Transaction updated"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
