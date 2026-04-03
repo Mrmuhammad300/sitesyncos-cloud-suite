@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ModulePage from "@/pages/ModulePage";
 
 // Lazy-loaded pages
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="*" element={
                 <ProtectedRoute>
                   <AppLayout>
+                    <ErrorBoundary>
                     <Suspense fallback={<Loading />}>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
@@ -107,6 +109,7 @@ const App = () => (
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
+                    </ErrorBoundary>
                   </AppLayout>
                 </ProtectedRoute>
               } />
