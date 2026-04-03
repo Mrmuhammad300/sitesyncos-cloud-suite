@@ -91,6 +91,7 @@ const App = () => (
                         <Route path="/ai/agents" element={<AgentsPage />} />
                         <Route path="/ai/analytics" element={<AnalyticsPage />} />
                         <Route path="/ai/simulator" element={<SimulatorPage />} />
+                        <Route path="/ai-assistant" element={<AIAssistantPage />} />
                         {/* Spatial */}
                         <Route path="/spatial/viewer" element={<ViewerPage />} />
                         <Route path="/spatial/plans" element={<FloorPlansPage />} />
