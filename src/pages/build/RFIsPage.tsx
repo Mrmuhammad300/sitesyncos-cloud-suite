@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Download } from "lucide-react";
+import { Plus, Search, Trash2, Download, Printer } from "lucide-react";
 import { useRFIs, useCreateRFI, useUpdateRFI, useDeleteRFI } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
-import { exportToCSV } from "@/lib/export";
+import { exportToCSV, printToPDF } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type RFI = Database["public"]["Tables"]["rfis"]["Row"];
@@ -96,6 +96,21 @@ export default function RFIsPage() {
     });
   };
 
+  const handlePrintPDF = () => {
+    const tableHtml = `<table>
+      <thead><tr><th>RFI #</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Due Date</th></tr></thead>
+      <tbody>${filtered.map(r => `<tr>
+        <td>${r.rfi_number}</td>
+        <td>${r.subject}</td>
+        <td>${r.priority}</td>
+        <td>${r.status}</td>
+        <td>${r.assigned_to ?? "—"}</td>
+        <td>${r.due_date ?? "—"}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+    printToPDF(`RFIs — ${new Date().toLocaleDateString()}`, tableHtml);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -108,6 +123,7 @@ export default function RFIsPage() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" variant="outline" onClick={handlePrintPDF}><Printer className="h-4 w-4 mr-1.5" />PDF</Button>
           <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New RFI</Button>
         </div>
       </div>
@@ -135,8 +151,37 @@ export default function RFIsPage() {
         </Select>
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Mobile cards — visible on small screens */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No RFIs found.</p>
+        ) : rows.map((rfi) => (
+          <Card key={rfi.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{rfi.subject}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{rfi.rfi_number}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(rfi.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge variant="outline" className={`text-[10px] ${priorityColor[rfi.priority] ?? ""}`}>{rfi.priority}</Badge>
+                <Badge variant="outline" className={`text-[10px] ${statusColor[rfi.status] ?? ""}`}>{rfi.status}</Badge>
+                {rfi.assigned_to && <span className="text-xs text-muted-foreground">{rfi.assigned_to}</span>}
+                {rfi.due_date && <span className="text-xs text-muted-foreground">Due {rfi.due_date}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Table — hidden on small screens */}
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>

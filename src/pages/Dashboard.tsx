@@ -11,18 +11,42 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useProjects } from "@/hooks/useProjectData";
 import { useRFIs } from "@/hooks/useProjectData";
 import { useProperties } from "@/hooks/useVaultData";
+import type { Database } from "@/integrations/supabase/types";
 
-const revenueData = [
-  { month: "Jul", budget: 2400, actual: 2200 },
-  { month: "Aug", budget: 2800, actual: 2900 },
-  { month: "Sep", budget: 3200, actual: 2800 },
-  { month: "Oct", budget: 3000, actual: 3100 },
-  { month: "Nov", budget: 3500, actual: 3400 },
-  { month: "Dec", budget: 3800, actual: 3200 },
-  { month: "Jan", budget: 4000, actual: 3900 },
-  { month: "Feb", budget: 3600, actual: 3800 },
-  { month: "Mar", budget: 4200, actual: 4100 },
-];
+type Project = Database["public"]["Tables"]["projects"]["Row"];
+
+/** Build a rolling 9-month Budget vs Actual chart from real project data. */
+function buildRevenueData(projects: Project[]) {
+  // Generate last 9 months ending at current month
+  const months: { key: string; month: string }[] = [];
+  const now = new Date();
+  for (let i = 8; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      month: d.toLocaleDateString("en-US", { month: "short" }),
+    });
+  }
+
+  // Group projects into their start_date month bucket (fall back to created_at month)
+  const buckets: Record<string, { budget: number; actual: number }> = {};
+  months.forEach((m) => { buckets[m.key] = { budget: 0, actual: 0 }; });
+
+  projects.forEach((p) => {
+    const raw = p.start_date ?? p.created_at;
+    const key = raw.slice(0, 7); // "YYYY-MM"
+    if (buckets[key]) {
+      buckets[key].budget += Number(p.budget) / 1000;   // scale to $K
+      buckets[key].actual += Number(p.spent)  / 1000;
+    }
+  });
+
+  return months.map((m) => ({
+    month: m.month,
+    budget: Math.round(buckets[m.key].budget),
+    actual: Math.round(buckets[m.key].actual),
+  }));
+}
 
 const STATUS_COLORS: Record<string, string> = {
   "On Track": "hsl(142, 76%, 36%)",
@@ -44,6 +68,8 @@ export default function Dashboard() {
   const { data: projects = [], isLoading: projectsLoading } = useProjects();
   const { data: rfis = [] } = useRFIs();
   const { data: properties = [] } = useProperties();
+
+  const revenueData = buildRevenueData(projects);
 
   const activeProjects = projects.filter(p => p.status !== "Complete");
   const portfolioValue = properties.reduce((s, p) => s + Number(p.price), 0);
@@ -104,7 +130,7 @@ export default function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Budget vs Actual Spend</CardTitle>
-            <CardDescription className="text-xs">Monthly comparison across all projects</CardDescription>
+            <CardDescription className="text-xs">Budget vs spend by project start month ($K)</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -121,7 +147,7 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" tickFormatter={(v) => `$${v / 1000}k`} />
+                <YAxis tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" tickFormatter={(v) => `$${v}k`} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(220,13%,91%)" }} />
                 <Area type="monotone" dataKey="budget" stroke="hsl(221, 83%, 53%)" fill="url(#budgetGrad)" strokeWidth={2} />
                 <Area type="monotone" dataKey="actual" stroke="hsl(262, 83%, 58%)" fill="url(#actualGrad)" strokeWidth={2} />

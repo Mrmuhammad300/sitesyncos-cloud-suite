@@ -105,7 +105,35 @@ const TenantsPage = () => {
         <div className="flex gap-2 flex-wrap">{filters.map((f) => (<Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>{f}</Button>))}</div>
       </div>
 
-      <Card><CardContent className="p-0">
+      {/* Mobile cards */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No tenants found.</p>
+        ) : rows.map((t) => (
+          <Card key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{t.tenant_name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.property_name}{t.unit ? ` · Unit ${t.unit}` : ""}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteId(t.id); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge className={`text-[10px] ${statusColor[t.status]}`}>{t.status}</Badge>
+                <span className="text-xs font-mono text-muted-foreground">${Number(t.monthly_rent).toLocaleString()}/mo</span>
+                {t.lease_end && <span className="text-xs text-muted-foreground">Ends {t.lease_end}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="hidden sm:block"><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
           <>
             <Table>

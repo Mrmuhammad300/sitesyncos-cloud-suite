@@ -3,20 +3,56 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Separator } from "@/components/ui/separator";
 import { Bell, Sun, Moon, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 
+const APPEARANCE_KEY = "sitesyncos-appearance";
+
+function getStoredDark(): boolean {
+  try {
+    const raw = localStorage.getItem(APPEARANCE_KEY);
+    if (raw) return (JSON.parse(raw) as { darkMode?: boolean }).darkMode ?? false;
+  } catch {}
+  return document.documentElement.classList.contains("dark");
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(getStoredDark);
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
 
+  // Keep DOM in sync with state
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
+  // Sync if SettingsPage changes localStorage from another tab or navigation
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === APPEARANCE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue) as { darkMode?: boolean };
+          if (typeof parsed.darkMode === "boolean") setDark(parsed.darkMode);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const toggleTheme = () => {
-    setDark(!dark);
-    document.documentElement.classList.toggle("dark");
+    setDark((prev) => {
+      const next = !prev;
+      try {
+        const raw = localStorage.getItem(APPEARANCE_KEY);
+        const existing = raw ? JSON.parse(raw) : {};
+        localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ ...existing, darkMode: next }));
+      } catch {}
+      return next;
+    });
   };
 
   const initials = profile?.display_name

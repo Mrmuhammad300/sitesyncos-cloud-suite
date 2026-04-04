@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,8 @@ interface SearchResult {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
@@ -38,11 +40,18 @@ export function GlobalSearch() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  const enabled = open && query.trim().length >= 1;
-  const q = `%${query.trim()}%`;
+  // Debounce search queries — only fire after 300ms of no typing
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [query]);
+
+  const enabled = open && debouncedQuery.trim().length >= 1;
+  const q = `%${debouncedQuery.trim()}%`;
 
   const { data: projects = [] } = useQuery({
-    queryKey: ["search-projects", query],
+    queryKey: ["search-projects", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase
@@ -61,7 +70,7 @@ export function GlobalSearch() {
   });
 
   const { data: rfis = [] } = useQuery({
-    queryKey: ["search-rfis", query],
+    queryKey: ["search-rfis", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase
@@ -80,7 +89,7 @@ export function GlobalSearch() {
   });
 
   const { data: documents = [] } = useQuery({
-    queryKey: ["search-documents", query],
+    queryKey: ["search-documents", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase
@@ -99,7 +108,7 @@ export function GlobalSearch() {
   });
 
   const { data: tenants = [] } = useQuery({
-    queryKey: ["search-tenants", query],
+    queryKey: ["search-tenants", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase
@@ -118,7 +127,7 @@ export function GlobalSearch() {
   });
 
   const { data: properties = [] } = useQuery({
-    queryKey: ["search-properties", query],
+    queryKey: ["search-properties", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase
@@ -137,7 +146,7 @@ export function GlobalSearch() {
   });
 
   const { data: workOrders = [] } = useQuery({
-    queryKey: ["search-work-orders", query],
+    queryKey: ["search-work-orders", debouncedQuery],
     enabled,
     queryFn: async () => {
       const { data } = await supabase

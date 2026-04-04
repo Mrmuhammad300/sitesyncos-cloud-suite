@@ -43,7 +43,15 @@ const AuditLogPage = lazy(() => import("@/pages/system/AuditLogPage"));
 const CompliancePage = lazy(() => import("@/pages/vault/CompliancePage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,   // data stays fresh for 5 minutes
+      gcTime:    10 * 60 * 1000,  // inactive cache lives for 10 minutes
+      retry: 1,
+    },
+  },
+});
 
 const Loading = () => (
   <div className="flex items-center justify-center h-full min-h-[200px]">

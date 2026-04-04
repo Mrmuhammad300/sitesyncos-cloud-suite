@@ -8,13 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, CreditCard, Clock, CheckCircle2, DollarSign, Trash2, Download } from "lucide-react";
+import { Search, Plus, CreditCard, Clock, CheckCircle2, DollarSign, Trash2, Download, Printer } from "lucide-react";
 import { useDrawRequests, useCreateDrawRequest, useDeleteDrawRequest } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
-import { exportToCSV } from "@/lib/export";
+import { exportToCSV, printToPDF } from "@/lib/export";
 
 type DrawRequest = Tables<"draw_requests">;
 
@@ -81,12 +81,28 @@ const DrawRequestsPage = () => {
     });
   };
 
+  const handlePrintPDF = () => {
+    const tableHtml = `<table>
+      <thead><tr><th>Draw #</th><th>Title</th><th>Status</th><th>Amount</th><th>Requested By</th><th>Submitted</th></tr></thead>
+      <tbody>${filtered.map(d => `<tr>
+        <td>${d.draw_number}</td>
+        <td>${d.title}</td>
+        <td>${d.status}</td>
+        <td>$${Number(d.amount).toLocaleString()}</td>
+        <td>${d.requested_by ?? "—"}</td>
+        <td>${d.submitted_date ?? "—"}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+    printToPDF(`Draw Requests — ${new Date().toLocaleDateString()}`, tableHtml);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Draw Requests</h1><p className="text-sm text-muted-foreground">Submit and approve draw requests</p></div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" onClick={handlePrintPDF}><Printer className="mr-2 h-4 w-4" />PDF</Button>
           <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Draw Request</Button>
         </div>
       </div>
