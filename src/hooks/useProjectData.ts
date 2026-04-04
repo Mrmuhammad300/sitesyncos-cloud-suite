@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
+export type SubmittalFile = Tables<"submittal_files">;
+
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       return data;
     },
@@ -60,7 +62,7 @@ export function useRFIs() {
   return useQuery({
     queryKey: ["rfis"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("rfis").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("rfis").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -111,7 +113,7 @@ export function useSubmittals() {
   return useQuery({
     queryKey: ["submittals"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("submittals").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("submittals").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -162,7 +164,7 @@ export function useChangeOrders() {
   return useQuery({
     queryKey: ["change_orders"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("change_orders").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("change_orders").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -213,7 +215,7 @@ export function useDailyReports() {
   return useQuery({
     queryKey: ["daily_reports"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("daily_reports").select("*").order("report_date", { ascending: false });
+      const { data, error } = await supabase.from("daily_reports").select("*").order("report_date", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -262,31 +264,18 @@ export function useDeleteDailyReport() {
 export type { Tables };
 
 // ─── Submittal Files ──────────────────────────────────────────────────────────
-// Note: submittal_files is not yet in generated types.ts — uses `as never` cast
-// until `supabase gen types` is re-run after applying submittal_files.sql
-
-export interface SubmittalFile {
-  id: string;
-  submittal_id: string;
-  file_name: string;
-  file_url: string;
-  file_size: string | null;
-  version: number;
-  uploaded_by: string | null;
-  notes: string | null;
-  created_at: string;
-}
 
 export function useSubmittalFiles(submittalId: string | null) {
   return useQuery({
     queryKey: ["submittal_files", submittalId],
     queryFn: async () => {
       if (!submittalId) return [] as SubmittalFile[];
-      const { data, error } = await (supabase as never as { from: (t: string) => { select: (s: string) => { eq: (col: string, val: string) => { order: (col: string, opts: object) => Promise<{ data: SubmittalFile[] | null; error: Error | null }> } } } })
+      const { data, error } = await supabase
         .from("submittal_files")
         .select("*")
         .eq("submittal_id", submittalId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data ?? [];
     },
@@ -297,8 +286,8 @@ export function useSubmittalFiles(submittalId: string | null) {
 export function useCreateSubmittalFile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { submittal_id: string; file_name: string; file_url: string; file_size: string | null; version: number; uploaded_by: string | null; notes: string | null }) => {
-      const { data, error } = await (supabase as never as { from: (t: string) => { insert: (p: object) => { select: () => { single: () => Promise<{ data: SubmittalFile | null; error: Error | null }> } } } })
+    mutationFn: async (payload: TablesInsert<"submittal_files">) => {
+      const { data, error } = await supabase
         .from("submittal_files")
         .insert(payload)
         .select()
@@ -318,7 +307,7 @@ export function useDeleteSubmittalFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, submittalId }: { id: string; submittalId: string }) => {
-      const { error } = await (supabase as never as { from: (t: string) => { delete: () => { eq: (col: string, val: string) => Promise<{ error: Error | null }> } } })
+      const { error } = await supabase
         .from("submittal_files")
         .delete()
         .eq("id", id);

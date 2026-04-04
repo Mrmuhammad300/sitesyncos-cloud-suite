@@ -1,13 +1,15 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Sun, Moon, LogOut } from "lucide-react";
+import { Bell, Sun, Moon, LogOut, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { useAppStore, selectUnreadCount, selectIsOffline } from "@/store/useAppStore";
 
 const APPEARANCE_KEY = "sitesyncos-appearance";
 
@@ -23,6 +25,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(getStoredDark);
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useAppStore(selectUnreadCount);
+  const isOffline = useAppStore(selectIsOffline);
+  const setOffline = useAppStore((s) => s.setOffline);
+  const clearUnread = useAppStore((s) => s.clearUnread);
+
+  // Subscribe to realtime updates for all modules
+  useRealtimeSync();
+
+  // Online/offline detection
+  useEffect(() => {
+    const handleOnline = () => setOffline(false);
+    const handleOffline = () => setOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    setOffline(!navigator.onLine);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [setOffline]);
 
   // Keep DOM in sync with state
   useEffect(() => {
@@ -79,9 +101,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Button variant="ghost" size="icon" className="text-muted-foreground h-9 w-9" onClick={toggleTheme}>
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" className="text-muted-foreground h-9 w-9 relative">
+              {isOffline && (
+                <div className="flex items-center gap-1 text-xs text-destructive px-2 py-1 bg-destructive/10 rounded">
+                  <WifiOff className="h-3 w-3" />
+                  <span>Offline</span>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground h-9 w-9 relative"
+                onClick={() => { navigate("/notifications"); clearUnread(); }}
+              >
                 <Bell className="h-4 w-4" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </Button>
               <Separator orientation="vertical" className="h-5 mx-2" />
               <DropdownMenu>

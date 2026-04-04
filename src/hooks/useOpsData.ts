@@ -8,7 +8,7 @@ export function useBudgets() {
   return useQuery({
     queryKey: ["budgets"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("budgets").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("budgets").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -32,7 +32,7 @@ export function useDrawRequests() {
   return useQuery({
     queryKey: ["draw_requests"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("draw_requests").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("draw_requests").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -56,7 +56,7 @@ export function useTenants() {
   return useQuery({
     queryKey: ["tenants"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("tenants").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("tenants").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -80,7 +80,7 @@ export function useWorkOrders() {
   return useQuery({
     queryKey: ["work_orders"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("work_orders").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("work_orders").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -104,7 +104,7 @@ export function useDocuments() {
   return useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("documents").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },

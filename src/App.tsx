@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -53,8 +55,17 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000,   // data stays fresh for 5 minutes
       gcTime:    10 * 60 * 1000,  // inactive cache lives for 10 minutes
       retry: 1,
+      // When offline, return cached data without erroring
+      networkMode: "offlineFirst",
     },
   },
+});
+
+// Persist query cache to localStorage for offline reads
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: "sitesyncos-query-cache",
+  throttleTime: 1000,
 });
 
 const Loading = () => (
@@ -66,7 +77,10 @@ const Loading = () => (
 const stubModules: { path: string; title: string; desc: string; module: string }[] = [];
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000 }}
+  >
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -140,7 +154,7 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;

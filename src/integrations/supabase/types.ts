@@ -14,6 +14,284 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          action: string
+          table_name: string
+          record_id: string | null
+          old_values: Json | null
+          new_values: Json | null
+          changed_fields: string[] | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          action: string
+          table_name: string
+          record_id?: string | null
+          old_values?: Json | null
+          new_values?: Json | null
+          changed_fields?: string[] | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          action?: string
+          table_name?: string
+          record_id?: string | null
+          old_values?: Json | null
+          new_values?: Json | null
+          changed_fields?: string[] | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blender_jobs: {
+        Row: {
+          id: string
+          user_id: string | null
+          project_id: string | null
+          job_type: "generate" | "clash" | "floor-plan" | "design-iterate"
+          prompt: string | null
+          status: "pending" | "processing" | "completed" | "failed"
+          result_url: string | null
+          result_metadata: Json | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          project_id?: string | null
+          job_type: "generate" | "clash" | "floor-plan" | "design-iterate"
+          prompt?: string | null
+          status?: "pending" | "processing" | "completed" | "failed"
+          result_url?: string | null
+          result_metadata?: Json | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          project_id?: string | null
+          job_type?: "generate" | "clash" | "floor-plan" | "design-iterate"
+          prompt?: string | null
+          status?: "pending" | "processing" | "completed" | "failed"
+          result_url?: string | null
+          result_metadata?: Json | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blender_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      floor_plan_variants: {
+        Row: {
+          id: string
+          project_id: string | null
+          blender_job_id: string | null
+          variant_number: number
+          variant_name: string | null
+          layout_json: Json
+          metrics: Json | null
+          status: "draft" | "approved" | "rejected"
+          approved_by: string | null
+          approved_at: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string | null
+          blender_job_id?: string | null
+          variant_number?: number
+          variant_name?: string | null
+          layout_json?: Json
+          metrics?: Json | null
+          status?: "draft" | "approved" | "rejected"
+          approved_by?: string | null
+          approved_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string | null
+          blender_job_id?: string | null
+          variant_number?: number
+          variant_name?: string | null
+          layout_json?: Json
+          metrics?: Json | null
+          status?: "draft" | "approved" | "rejected"
+          approved_by?: string | null
+          approved_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_plan_variants_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_models: {
+        Row: {
+          id: string
+          blender_job_id: string | null
+          model_name: string
+          file_format: "glb" | "gltf" | "png" | "svg"
+          file_url: string
+          thumbnail_url: string | null
+          layers: Json | null
+          bounds: Json | null
+          element_count: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          blender_job_id?: string | null
+          model_name: string
+          file_format: "glb" | "gltf" | "png" | "svg"
+          file_url: string
+          thumbnail_url?: string | null
+          layers?: Json | null
+          bounds?: Json | null
+          element_count?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          blender_job_id?: string | null
+          model_name?: string
+          file_format?: "glb" | "gltf" | "png" | "svg"
+          file_url?: string
+          thumbnail_url?: string | null
+          layers?: Json | null
+          bounds?: Json | null
+          element_count?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_models_blender_job_id_fkey"
+            columns: ["blender_job_id"]
+            isOneToOne: false
+            referencedRelation: "blender_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submittal_files: {
+        Row: {
+          id: string
+          submittal_id: string
+          file_name: string
+          file_url: string
+          file_size: string | null
+          version: number
+          uploaded_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          submittal_id: string
+          file_name: string
+          file_url: string
+          file_size?: string | null
+          version?: number
+          uploaded_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          submittal_id?: string
+          file_name?: string
+          file_url?: string
+          file_size?: string | null
+          version?: number
+          uploaded_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submittal_files_submittal_id_fkey"
+            columns: ["submittal_id"]
+            isOneToOne: false
+            referencedRelation: "submittals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          id: string
+          name: string
+          url: string
+          secret: string | null
+          events: string[]
+          is_active: boolean
+          last_triggered_at: string | null
+          last_status: number | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          url: string
+          secret?: string | null
+          events?: string[]
+          is_active?: boolean
+          last_triggered_at?: string | null
+          last_status?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          url?: string
+          secret?: string | null
+          events?: string[]
+          is_active?: boolean
+          last_triggered_at?: string | null
+          last_status?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_decisions: {
         Row: {
           agent_id: string
@@ -1163,6 +1441,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<string, never>
         Returns: boolean
       }
     }

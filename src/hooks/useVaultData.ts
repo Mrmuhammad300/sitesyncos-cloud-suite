@@ -16,7 +16,7 @@ export function useProperties() {
   return useQuery({
     queryKey: ["properties"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("properties").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("properties").select("*").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -67,7 +67,7 @@ export function useLenders() {
   return useQuery({
     queryKey: ["lenders"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("lenders").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("lenders").select("*").order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       return data;
     },
@@ -118,7 +118,7 @@ export function useTreasuryTransactions() {
   return useQuery({
     queryKey: ["treasury_transactions"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("treasury_transactions").select("*").order("txn_date", { ascending: false });
+      const { data, error } = await supabase.from("treasury_transactions").select("*").order("txn_date", { ascending: false }).limit(1000);
       if (error) throw error;
       return data;
     },

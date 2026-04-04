@@ -27,6 +27,25 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SITE_URL       = Deno.env.get("SITE_URL") ?? "https://app.sitesyncos.com";
 const FROM_EMAIL     = "noreply@sitesyncos.com";
 
+// ─── HTML escaping to prevent XSS in email templates ─────────────────────────
+
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+function fmtCurrency(value: unknown): string {
+  const n = Number(value);
+  return isNaN(n) ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface NotificationPayload {
   type: string;
   record: Record<string, unknown>;
@@ -39,6 +58,8 @@ interface Email {
   html: string;
 }
 
+// ─── Email templates ─────────────────────────────────────────────────────────
+
 function buildEmail(payload: NotificationPayload): Email | null {
   const { type, record } = payload;
 
@@ -46,29 +67,33 @@ function buildEmail(payload: NotificationPayload): Email | null {
     case "rfi_created":
       return {
         to: payload.recipient_email ?? "",
-        subject: `New RFI: ${record.rfi_number} — ${record.subject}`,
+        subject: `New RFI: ${esc(record.rfi_number)} — ${esc(record.subject)}`,
         html: `
           <h2>New RFI Submitted</h2>
-          <p><strong>RFI #:</strong> ${record.rfi_number}</p>
-          <p><strong>Subject:</strong> ${record.subject}</p>
-          <p><strong>Priority:</strong> ${record.priority}</p>
-          <p><strong>Due:</strong> ${record.due_date ?? "Not set"}</p>
-          <p><a href="${SITE_URL}/build/rfis">View in SiteSync →</a></p>
+          <p><strong>RFI #:</strong> ${esc(record.rfi_number)}</p>
+          <p><strong>Subject:</strong> ${esc(record.subject)}</p>
+          <p><strong>Priority:</strong> ${esc(record.priority)}</p>
+          <p><strong>Due:</strong> ${record.due_date ? esc(record.due_date) : "Not set"}</p>
+          ${record.description ? `<p><strong>Description:</strong> ${esc(record.description)}</p>` : ""}
+          <p><a href="${esc(SITE_URL)}/build/rfis">View in SiteSync →</a></p>
         `,
       };
 
     case "draw_approved":
     case "draw_rejected": {
-      const status = type === "draw_approved" ? "Approved ✅" : "Rejected ❌";
+      const approved = type === "draw_approved";
+      const statusLabel = approved ? "Approved ✅" : "Rejected ❌";
       return {
         to: payload.recipient_email ?? "",
-        subject: `Draw Request ${status}: ${record.draw_number}`,
+        subject: `Draw Request ${statusLabel}: ${esc(record.draw_number)}`,
         html: `
-          <h2>Draw Request ${status}</h2>
-          <p><strong>Draw #:</strong> ${record.draw_number}</p>
-          <p><strong>Amount:</strong> $${Number(record.amount_requested).toLocaleString()}</p>
-          <p><strong>Status:</strong> ${record.status}</p>
-          <p><a href="${SITE_URL}/ops/draws">View in SiteSync →</a></p>
+          <h2>Draw Request ${statusLabel}</h2>
+          <p><strong>Draw #:</strong> ${esc(record.draw_number)}</p>
+          <p><strong>Title:</strong> ${esc(record.title)}</p>
+          <p><strong>Amount:</strong> ${fmtCurrency(record.amount)}</p>
+          <p><strong>Status:</strong> ${esc(record.status)}</p>
+          ${record.description ? `<p><strong>Notes:</strong> ${esc(record.description)}</p>` : ""}
+          <p><a href="${esc(SITE_URL)}/ops/draws">View in SiteSync →</a></p>
         `,
       };
     }
@@ -78,16 +103,17 @@ function buildEmail(payload: NotificationPayload): Email | null {
       return {
         to: payload.recipient_email ?? "",
         subject: hasSafety
-          ? `⚠️ Safety Incident Reported — ${record.report_date}`
-          : `Daily Report Filed — ${record.report_date}`,
+          ? `⚠️ Safety Incident Reported — ${esc(record.report_date)}`
+          : `Daily Report Filed — ${esc(record.report_date)}`,
         html: `
-          <h2>Daily Report: ${record.report_number}</h2>
-          <p><strong>Date:</strong> ${record.report_date}</p>
-          <p><strong>Author:</strong> ${record.author_name ?? "Unknown"}</p>
-          <p><strong>Crew:</strong> ${record.crew_count} workers · ${record.work_hours}h</p>
-          <p><strong>Weather:</strong> ${record.weather ?? "Not recorded"}</p>
-          ${hasSafety ? `<p style="color:red"><strong>Safety Incidents: ${record.safety_incidents}</strong></p>` : ""}
-          <p><a href="${SITE_URL}/build/daily-reports">View in SiteSync →</a></p>
+          <h2>Daily Report: ${esc(record.report_number)}</h2>
+          <p><strong>Date:</strong> ${esc(record.report_date)}</p>
+          <p><strong>Author:</strong> ${record.author_name ? esc(record.author_name) : "Unknown"}</p>
+          <p><strong>Crew:</strong> ${esc(record.crew_count)} workers · ${esc(record.work_hours)}h</p>
+          <p><strong>Weather:</strong> ${record.weather ? esc(record.weather) : "Not recorded"}</p>
+          ${hasSafety ? `<p style="color:red"><strong>Safety Incidents: ${esc(record.safety_incidents)}</strong></p>` : ""}
+          ${record.summary ? `<p><strong>Summary:</strong> ${esc(record.summary)}</p>` : ""}
+          <p><a href="${esc(SITE_URL)}/build/daily-reports">View in SiteSync →</a></p>
         `,
       };
     }
@@ -95,14 +121,33 @@ function buildEmail(payload: NotificationPayload): Email | null {
     case "change_order": {
       return {
         to: payload.recipient_email ?? "",
-        subject: `Change Order ${record.co_number}: ${record.title} — ${record.status}`,
+        subject: `Change Order ${esc(record.co_number)}: ${esc(record.title)} — ${esc(record.status)}`,
         html: `
           <h2>Change Order Update</h2>
-          <p><strong>CO #:</strong> ${record.co_number}</p>
-          <p><strong>Title:</strong> ${record.title}</p>
-          <p><strong>Amount:</strong> $${Number(record.amount).toLocaleString()}</p>
-          <p><strong>Status:</strong> ${record.status}</p>
-          <p><a href="${SITE_URL}/build/change-orders">View in SiteSync →</a></p>
+          <p><strong>CO #:</strong> ${esc(record.co_number)}</p>
+          <p><strong>Title:</strong> ${esc(record.title)}</p>
+          <p><strong>Amount:</strong> ${fmtCurrency(record.amount)}</p>
+          <p><strong>Days Impact:</strong> ${esc(record.days_impact)} days</p>
+          <p><strong>Status:</strong> ${esc(record.status)}</p>
+          ${record.reason ? `<p><strong>Reason:</strong> ${esc(record.reason)}</p>` : ""}
+          <p><a href="${esc(SITE_URL)}/build/change-orders">View in SiteSync →</a></p>
+        `,
+      };
+    }
+
+    case "work_order_created": {
+      return {
+        to: payload.recipient_email ?? "",
+        subject: `New Work Order ${esc(record.wo_number)}: ${esc(record.title)}`,
+        html: `
+          <h2>New Work Order</h2>
+          <p><strong>WO #:</strong> ${esc(record.wo_number)}</p>
+          <p><strong>Title:</strong> ${esc(record.title)}</p>
+          <p><strong>Priority:</strong> ${esc(record.priority)}</p>
+          ${record.assigned_to ? `<p><strong>Assigned To:</strong> ${esc(record.assigned_to)}</p>` : ""}
+          ${record.due_date ? `<p><strong>Due:</strong> ${esc(record.due_date)}</p>` : ""}
+          ${record.description ? `<p><strong>Description:</strong> ${esc(record.description)}</p>` : ""}
+          <p><a href="${esc(SITE_URL)}/ops/work-orders">View in SiteSync →</a></p>
         `,
       };
     }
@@ -111,6 +156,8 @@ function buildEmail(payload: NotificationPayload): Email | null {
       return null;
   }
 }
+
+// ─── Email sender ─────────────────────────────────────────────────────────────
 
 async function sendEmail(email: Email): Promise<void> {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY secret not set");
@@ -136,18 +183,43 @@ async function sendEmail(email: Email): Promise<void> {
   }
 }
 
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": SITE_URL,
         "Access-Control-Allow-Headers": "authorization, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
       },
+    });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
     });
   }
 
   try {
     const payload: NotificationPayload = await req.json();
+
+    if (!payload.type || typeof payload.type !== "string") {
+      return new Response(JSON.stringify({ error: "Invalid payload: type is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (!payload.record || typeof payload.record !== "object") {
+      return new Response(JSON.stringify({ error: "Invalid payload: record is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const email = buildEmail(payload);
 
     if (!email) {
@@ -165,8 +237,9 @@ Deno.serve(async (req: Request) => {
       );
       const { data: admins } = await supabase
         .from("profiles")
-        .select("user_id")
-        .in("role", ["admin", "super_admin"]);
+        .select("user_id, display_name")
+        .in("role", ["admin", "super_admin"])
+        .limit(10);
 
       if (!admins?.length) {
         return new Response(JSON.stringify({ skipped: true, reason: "No admin recipients found" }), {
@@ -174,8 +247,16 @@ Deno.serve(async (req: Request) => {
           headers: { "Content-Type": "application/json" },
         });
       }
-      // Send to first admin for now (extend to loop over all admins as needed)
-      email.to = `${admins[0].user_id}@placeholder.com`; // replace with actual email lookup
+
+      // Look up actual email from auth.users via service role
+      const { data: authUser } = await supabase.auth.admin.getUserById(admins[0].user_id);
+      if (!authUser?.user?.email) {
+        return new Response(JSON.stringify({ skipped: true, reason: "Could not resolve admin email" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      email.to = authUser.user.email;
     }
 
     await sendEmail(email);
