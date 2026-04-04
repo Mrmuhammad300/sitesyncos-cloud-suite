@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Trash2, Download, Printer } from "lucide-react";
-import { useRFIs, useCreateRFI, useUpdateRFI, useDeleteRFI } from "@/hooks/useProjectData";
+import { useRFIs, useCreateRFI, useUpdateRFI, useDeleteRFI, useProjects } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
@@ -38,12 +38,14 @@ const PRIORITIES = ["High", "Medium", "Low"] as const;
 
 export default function RFIsPage() {
   const { data: rfis = [], isLoading } = useRFIs();
+  const { data: projects = [] } = useProjects();
   const createRFI = useCreateRFI();
   const updateRFI = useUpdateRFI();
   const deleteRFI = useDeleteRFI();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ subject: "", description: "", priority: "Medium", assigned_to: "", due_date: "" });
@@ -52,7 +54,8 @@ export default function RFIsPage() {
     const ms = r.subject.toLowerCase().includes(search.toLowerCase()) ||
       r.rfi_number.toLowerCase().includes(search.toLowerCase());
     const mst = statusFilter === "all" || r.status === statusFilter;
-    return ms && mst;
+    const mp = projectFilter === "all" || r.project_id === projectFilter;
+    return ms && mst && mp;
   });
 
   const {
@@ -137,8 +140,8 @@ export default function RFIsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search RFIs…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
         </div>
@@ -149,6 +152,15 @@ export default function RFIsPage() {
             {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+        {projects.length > 0 && (
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="All Projects" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Mobile cards — visible on small screens */}
