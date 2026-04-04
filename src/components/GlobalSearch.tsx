@@ -186,12 +186,12 @@ export function GlobalSearch() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="relative flex items-center h-9 w-full max-w-md rounded-md bg-muted/50 border-0 px-3 gap-2 text-sm text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="ss-search flex items-center h-9 w-full max-w-md px-4 gap-2 text-sm text-muted-foreground transition-all focus-visible:outline-none"
       >
         <Search className="h-4 w-4 shrink-0" />
         <span className="flex-1 text-left">Search projects, documents, tasks…</span>
-        <kbd className="hidden sm:inline-flex pointer-events-none select-none items-center gap-0.5 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
-          <span>⌘</span>K
+        <kbd className="hidden sm:inline-flex pointer-events-none select-none items-center gap-0.5 rounded-md border border-border bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+          Cmd+K
         </kbd>
       </button>
 
