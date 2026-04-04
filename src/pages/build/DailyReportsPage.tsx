@@ -49,8 +49,7 @@ export default function DailyReportsPage() {
   const filtered = reports.filter(r => {
     const ms = r.report_number.toLowerCase().includes(search.toLowerCase()) ||
       (r.author_name ?? "").toLowerCase().includes(search.toLowerCase());
-    const mst = statusFilter === "all" || r.status === statusFilter;
-    return ms && mst;
+    return ms;
   });
 
   const {
