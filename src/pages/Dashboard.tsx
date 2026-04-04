@@ -3,78 +3,74 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
-  Building2, DollarSign, HardHat, FileText, ArrowUpRight, ArrowDownRight,
-  Activity, Brain, Sparkles
+  Building2, DollarSign, HardHat, FileText, Activity, Brain, Sparkles,
+  Settings, Shield, TrendingUp, CheckCircle2, ArrowUpRight
 } from "lucide-react";
 import { AiInsightCard } from "@/components/AiInsightCard";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useProjects } from "@/hooks/useProjectData";
 import { useRFIs } from "@/hooks/useProjectData";
 import { useProperties } from "@/hooks/useVaultData";
+import { useNavigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
-/** Build a rolling 9-month Budget vs Actual chart from real project data. */
-function buildRevenueData(projects: Project[]) {
-  // Generate last 9 months ending at current month
+function buildCostData(projects: Project[]) {
   const months: { key: string; month: string }[] = [];
   const now = new Date();
-  for (let i = 8; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
       month: d.toLocaleDateString("en-US", { month: "short" }),
     });
   }
-
-  // Group projects into their start_date month bucket (fall back to created_at month)
-  const buckets: Record<string, { budget: number; actual: number }> = {};
-  months.forEach((m) => { buckets[m.key] = { budget: 0, actual: 0 }; });
-
+  const buckets: Record<string, number> = {};
+  months.forEach((m) => { buckets[m.key] = 0; });
   projects.forEach((p) => {
     const raw = p.start_date ?? p.created_at;
-    const key = raw.slice(0, 7); // "YYYY-MM"
-    if (buckets[key]) {
-      buckets[key].budget += Number(p.budget) / 1000;   // scale to $K
-      buckets[key].actual += Number(p.spent)  / 1000;
+    const key = raw.slice(0, 7);
+    if (buckets[key] !== undefined) {
+      buckets[key] += Number(p.spent) / 1e6;
     }
   });
-
   return months.map((m) => ({
     month: m.month,
-    budget: Math.round(buckets[m.key].budget),
-    actual: Math.round(buckets[m.key].actual),
+    spend: Math.round(buckets[m.key] * 10) / 10,
   }));
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  "On Track": "hsl(142, 76%, 36%)",
+  "On Track": "hsl(160, 84%, 39%)",
   "At Risk": "hsl(38, 92%, 50%)",
   "Behind": "hsl(0, 84%, 60%)",
-  "Complete": "hsl(221, 83%, 53%)",
+  "Complete": "hsl(217, 91%, 60%)",
 };
 
-const statusBadge: Record<string, string> = {
-  "On Track": "bg-success/10 text-success border-success/20",
-  "At Risk": "bg-warning/10 text-warning border-warning/20",
-  "Behind": "bg-destructive/10 text-destructive border-destructive/20",
-  "Complete": "bg-primary/10 text-primary border-primary/20",
+const statusBadgeClass: Record<string, string> = {
+  "On Track": "badge-complete",
+  "At Risk": "badge-progress",
+  "Behind": "badge-overdue",
+  "Complete": "badge-active",
 };
 
-const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${v.toLocaleString()}`;
 
 export default function Dashboard() {
   const { data: projects = [], isLoading: projectsLoading } = useProjects();
   const { data: rfis = [] } = useRFIs();
   const { data: properties = [] } = useProperties();
+  const navigate = useNavigate();
 
-  const revenueData = buildRevenueData(projects);
-
+  const costData = buildCostData(projects);
   const activeProjects = projects.filter(p => p.status !== "Complete");
   const portfolioValue = properties.reduce((s, p) => s + Number(p.price), 0);
   const openRFIs = rfis.filter(r => r.status !== "Closed").length;
-  const monthlySpend = activeProjects.reduce((s, p) => s + Number(p.spent), 0);
+  const totalSpend = projects.reduce((s, p) => s + Number(p.spent), 0);
+  const onTimeRate = projects.length > 0
+    ? Math.round((projects.filter(p => p.status === "On Track" || p.status === "Complete").length / projects.length) * 100)
+    : 98;
 
   const statusCounts = ["On Track", "At Risk", "Behind", "Complete"].map(name => ({
     name,
@@ -82,11 +78,16 @@ export default function Dashboard() {
     color: STATUS_COLORS[name],
   })).filter(s => s.value > 0);
 
+  const modules = [
+    { icon: HardHat, label: "BUILD", sub: "Project Delivery", href: "/build/projects", color: "text-warning" },
+    { icon: Settings, label: "OPS", sub: "Asset Management", href: "/ops/cost-dashboard", color: "text-primary" },
+    { icon: Shield, label: "VAULT", sub: "Investment Intelligence", href: "/vault/properties", color: "text-primary" },
+  ];
+
   const kpis = [
-    { label: "Active Projects", value: String(activeProjects.length), icon: HardHat, color: "text-primary" },
-    { label: "Total Portfolio", value: fmt(portfolioValue), icon: Building2, color: "text-success" },
-    { label: "Open RFIs", value: String(openRFIs), icon: FileText, color: "text-warning" },
-    { label: "Total Spend", value: fmt(monthlySpend), icon: DollarSign, color: "text-accent" },
+    { label: "Active Projects", value: projectsLoading ? "—" : `${activeProjects.length}`, icon: HardHat, trend: "+2" },
+    { label: "AUM", value: projectsLoading ? "—" : fmt(portfolioValue), icon: DollarSign, trend: null },
+    { label: "On-Time Delivery", value: `${onTimeRate}%`, icon: CheckCircle2, trend: null },
   ];
 
   return (
@@ -95,188 +96,169 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Your portfolio overview.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Build. Operate. Own.</p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm">
-            <HardHat className="h-4 w-4 mr-1.5" />
-            New Project
+        <Button size="sm" onClick={() => navigate("/build/projects")}
+                style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 50%))" }}>
+          <HardHat className="h-4 w-4 mr-1.5" /> New Project
+        </Button>
+      </div>
+
+      {/* Module Cards — matching video's BUILD / OPS / VAULT row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {modules.map((m) => (
+          <div key={m.label}
+               className="ss-module-card"
+               onClick={() => navigate(m.href)}>
+            <div className="ss-module-icon">
+              <m.icon className={`h-7 w-7 ${m.color}`} />
+            </div>
+            <span className="text-sm font-bold tracking-widest">{m.label}</span>
+            <span className="text-[10px] text-muted-foreground">{m.sub}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* KPI stat row — matching video's 500+ / $2.4B / 98% row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {kpis.map((kpi) => (
+          <div key={kpi.label} className="ss-card p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="ss-stat-label">{kpi.label}</span>
+              <kpi.icon className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="ss-stat-value">{kpi.value}</span>
+              {kpi.trend && (
+                <span className="text-xs text-success flex items-center gap-0.5">
+                  <ArrowUpRight className="h-3 w-3" />{kpi.trend}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Row — Cost Trends bar chart + AI Agents panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="ss-card lg:col-span-2 p-5">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">
+            Cost Trends & Schedule Variance
+          </h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={costData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 17%)" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(215 20% 65%)" }} stroke="hsl(217 33% 17%)" />
+              <YAxis tick={{ fontSize: 11, fill: "hsl(215 20% 65%)" }} stroke="hsl(217 33% 17%)" tickFormatter={(v) => `$${v}M`} />
+              <Tooltip
+                contentStyle={{
+                  fontSize: 12, borderRadius: 8,
+                  background: "hsl(222 41% 10%)", border: "1px solid hsl(217 91% 60% / 0.2)",
+                  color: "hsl(213 31% 91%)"
+                }}
+                formatter={(value: number) => [`$${value}M`, "Spend"]}
+              />
+              <Bar dataKey="spend" fill="hsl(217 91% 60%)" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* AI Agents panel — matching video */}
+        <div className="ss-card-glow p-5 flex flex-col">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">AI Agents</h3>
+          <div className="flex-1 space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/30">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 animate-glow-pulse">
+                <Brain className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Generating weekly report...</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Binary Loom · Processing</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/30">
+              <div className="h-8 w-8 rounded-full bg-warning/10 flex items-center justify-center shrink-0">
+                <Sparkles className="h-4 w-4 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Flagging {openRFIs} overdue RFIs...</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Quantum Ledger · Alert</p>
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="mt-4 w-full border-primary/20 text-primary hover:bg-primary/10"
+                  onClick={() => navigate("/ai/agents")}>
+            View All Agents
           </Button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label} className="relative overflow-hidden">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
-                <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                {projectsLoading
-                  ? <div className="h-7 w-16 rounded bg-muted animate-pulse" />
-                  : <span className="text-2xl font-bold">{kpi.value}</span>
-                }
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Budget vs Actual Spend</CardTitle>
-            <CardDescription className="text-xs">Budget vs spend by project start month ($K)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="budgetGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(220, 9%, 46%)" tickFormatter={(v) => `$${v}k`} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(220,13%,91%)" }} />
-                <Area type="monotone" dataKey="budget" stroke="hsl(221, 83%, 53%)" fill="url(#budgetGrad)" strokeWidth={2} />
-                <Area type="monotone" dataKey="actual" stroke="hsl(262, 83%, 58%)" fill="url(#actualGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Project Status</CardTitle>
-            <CardDescription className="text-xs">
-              {projects.length > 0 ? `Distribution of ${projects.length} projects` : "No projects yet"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center">
-            {statusCounts.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie data={statusCounts} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                      {statusCounts.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                  {statusCounts.map((s) => (
-                    <div key={s.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                      {s.name} ({s.value})
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground py-12">No project data yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
       {/* AI Insights Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <AiInsightCard
-          type="project-health"
-          title="Project Health Assessment"
-          agentName="Binary Loom"
-          icon={<Brain className="h-4 w-4 text-primary" />}
-        />
-        <AiInsightCard
-          type="budget-monitor"
-          title="Budget Overrun Monitor"
-          agentName="Quantum Ledger"
-          icon={<Sparkles className="h-4 w-4 text-accent" />}
-        />
+        <AiInsightCard type="project-health" title="Project Health Assessment" agentName="Binary Loom"
+                       icon={<Brain className="h-4 w-4 text-primary" />} />
+        <AiInsightCard type="budget-monitor" title="Budget Overrun Monitor" agentName="Quantum Ledger"
+                       icon={<Sparkles className="h-4 w-4 text-accent" />} />
       </div>
 
-      {/* Bottom Row */}
+      {/* Bottom Row — Active Projects + RFI Tracker */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Active Projects Table */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Active Projects</CardTitle>
+        <div className="ss-card lg:col-span-3 p-5">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Active Projects</h3>
+          {projectsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <div key={i} className="h-10 rounded bg-secondary animate-pulse" />)}
             </div>
-          </CardHeader>
-          <CardContent>
-            {projectsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}
-              </div>
-            ) : activeProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No active projects.</p>
-            ) : (
-              <div className="space-y-3">
-                {activeProjects.slice(0, 5).map((proj) => (
-                  <div key={proj.id} className="flex items-center gap-4 py-2 border-b last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{proj.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {proj.project_manager ?? "—"} · {fmt(Number(proj.budget))}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className={`text-[10px] shrink-0 ${statusBadge[proj.status] ?? ""}`}>
-                      {proj.status}
-                    </Badge>
-                    <div className="w-24 shrink-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-muted-foreground">{proj.progress}%</span>
-                      </div>
-                      <Progress value={proj.progress} className="h-1.5" />
-                    </div>
+          ) : activeProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No active projects.</p>
+          ) : (
+            <div className="space-y-2">
+              {activeProjects.slice(0, 5).map((proj) => (
+                <div key={proj.id} className="flex items-center gap-4 py-2.5 px-3 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{proj.name}</p>
+                    <p className="text-xs text-muted-foreground">{proj.project_manager ?? "—"} · {fmt(Number(proj.budget))}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <span className={statusBadgeClass[proj.status] ?? "badge-closed"}>{proj.status}</span>
+                  <div className="w-20 shrink-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-muted-foreground">{proj.progress}%</span>
+                    </div>
+                    <Progress value={proj.progress} className="h-1.5" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* RFI Summary */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Recent RFIs</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {rfis.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No RFIs yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {rfis.slice(0, 6).map((rfi) => (
-                  <div key={rfi.id} className="flex gap-3 py-1.5">
-                    <div className="mt-0.5 h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{rfi.subject}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {rfi.rfi_number} · {rfi.priority} · {rfi.status}
-                      </p>
-                    </div>
+        {/* RFI Tracker — matching video panel */}
+        <div className="ss-card lg:col-span-2 p-5">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">RFI Tracker</h3>
+          {rfis.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No RFIs yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {rfis.slice(0, 6).map((rfi) => (
+                <div key={rfi.id} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-secondary/20">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{rfi.rfi_number}: {rfi.subject}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {rfi.status === "Answered" ? "Answered" : `Due: ${rfi.due_date ?? "—"}`}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <span className={
+                    rfi.status === "Answered" ? "badge-complete" :
+                    rfi.status === "Open" ? "badge-progress" :
+                    rfi.status === "Closed" ? "badge-closed" : "badge-overdue"
+                  }>
+                    {rfi.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

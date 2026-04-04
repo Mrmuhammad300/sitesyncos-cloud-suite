@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Lock, Mail, Eye, EyeOff, User } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, User, HardHat, Settings, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +18,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn, signUp, session } = useAuth();
 
-  // Redirect if already logged in
   if (session) { navigate("/", { replace: true }); return null; }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +30,7 @@ export default function LoginPage() {
     } else {
       const { error } = await signUp(email, password, displayName || undefined);
       if (error) { toast.error(error.message); setLoading(false); return; }
-      toast.success("Check your email to confirm your account!");
+      toast.success("Account created! You can sign in now.");
     }
     setLoading(false);
   };
@@ -47,77 +45,123 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2.5 mb-4">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
-            </div>
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden dark"
+         style={{ background: "linear-gradient(135deg, hsl(222 47% 4%), hsl(222 47% 8%), hsl(222 47% 4%))" }}>
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-[0.03]"
+           style={{ background: "radial-gradient(circle, hsl(217 91% 60%), transparent)" }} />
+      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 rounded-full opacity-[0.04]"
+           style={{ background: "radial-gradient(circle, hsl(262 83% 58%), transparent)" }} />
+
+      {/* Module pills at top */}
+      <div className="flex gap-3 mb-10 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+        {[
+          { icon: HardHat, label: "BUILD", sub: "Project Delivery" },
+          { icon: Settings, label: "OPS", sub: "Asset Management" },
+          { icon: Shield, label: "VAULT", sub: "Investment Intelligence" },
+        ].map((m) => (
+          <div key={m.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg"
+               style={{
+                 background: "hsl(222 41% 10% / 0.6)",
+                 border: "1px solid hsl(217 91% 60% / 0.15)",
+               }}>
+            <m.icon className="h-4 w-4 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">BuildOS</h1>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">SiteSync</p>
+              <p className="text-xs font-bold text-foreground tracking-wide">{m.label}</p>
+              <p className="text-[9px] text-muted-foreground">{m.sub}</p>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+        ))}
+      </div>
+
+      {/* Logo */}
+      <div className="text-center mb-8 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center"
+               style={{
+                 background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 50%))",
+                 boxShadow: "0 0 24px hsl(217 91% 60% / 0.3)",
+               }}>
+            <span className="text-xl font-black text-primary-foreground">S</span>
+          </div>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">SiteSync</h1>
+            <p className="text-[11px] font-medium text-muted-foreground tracking-[0.2em]">Build. Operate. Own.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Login card */}
+      <div className="w-full max-w-sm px-4 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+        <div className="ss-card-glow p-6 rounded-xl">
+          <p className="text-sm font-medium text-muted-foreground text-center mb-5">
             {isLogin ? "Sign in to your account" : "Create your account"}
           </p>
-        </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label className="text-xs">Display Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="pl-9 h-10" />
-                  </div>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label className="text-xs">Email</Label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Display Name</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9 h-10" required />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                         className="pl-9 h-10 bg-secondary/50 border-border" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-9 pr-9 h-10" required />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)}>
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input type="email" placeholder="you@company.com" value={email}
+                       onChange={(e) => setEmail(e.target.value)}
+                       className="pl-9 h-10 bg-secondary/50 border-border" required />
               </div>
-
-              {isLogin && (
-                <div className="text-right">
-                  <button type="button" className="text-xs text-primary hover:underline" onClick={handleForgotPassword}>Forgot password?</button>
-                </div>
-              )}
-
-              <Button type="submit" className="w-full h-10" disabled={loading}>
-                {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
-              </Button>
-            </form>
-
-            <div className="mt-4 text-center text-xs text-muted-foreground">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button className="text-primary hover:underline font-medium" onClick={() => setIsLogin(!isLogin)}>
-                {isLogin ? "Sign up" : "Sign in"}
-              </button>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password}
+                       onChange={(e) => setPassword(e.target.value)}
+                       className="pl-9 pr-9 h-10 bg-secondary/50 border-border" required />
+                <button type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
 
-        <p className="text-center text-[10px] text-muted-foreground">
-          Enterprise construction & real estate operating system
-        </p>
+            {isLogin && (
+              <div className="text-right">
+                <button type="button" className="text-xs text-primary hover:underline" onClick={handleForgotPassword}>
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full h-10 font-semibold" disabled={loading}
+                    style={{
+                      background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 50%))",
+                      boxShadow: "0 0 16px hsl(217 91% 60% / 0.25)",
+                    }}>
+              {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <button className="text-primary hover:underline font-medium" onClick={() => setIsLogin(!isLogin)}>
+              {isLogin ? "Sign up" : "Sign in"}
+            </button>
+          </div>
+        </div>
       </div>
+
+      <p className="mt-8 text-[10px] text-muted-foreground/60 animate-slide-up" style={{ animationDelay: "0.4s" }}>
+        Enterprise Construction & Real Estate Operating System
+      </p>
     </div>
   );
 }
