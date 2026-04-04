@@ -1,11 +1,184 @@
-import ModulePage from "@/pages/ModulePage";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Search } from "lucide-react";
+import { useSubmittals, useCreateSubmittal, useUpdateSubmittal } from "@/hooks/useProjectData";
+import type { Database } from "@/integrations/supabase/types";
+
+type Submittal = Database["public"]["Tables"]["submittals"]["Row"];
+
+const statusColor: Record<string, string> = {
+  Pending: "bg-muted text-muted-foreground",
+  "Under Review": "bg-warning/10 text-warning border-warning/20",
+  Approved: "bg-success/10 text-success border-success/20",
+  Rejected: "bg-destructive/10 text-destructive border-destructive/20",
+  Resubmit: "bg-accent/10 text-accent border-accent/20",
+};
+
+const STATUSES = ["Pending", "Under Review", "Approved", "Rejected", "Resubmit"] as const;
 
 export default function SubmittalsPage() {
+  const { data: submittals = [], isLoading } = useSubmittals();
+  const createSubmittal = useCreateSubmittal();
+  const updateSubmittal = useUpdateSubmittal();
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    spec_section: "",
+    submitted_by: "",
+    reviewer: "",
+    due_date: "",
+  });
+
+  const filtered = submittals.filter(s => {
+    const ms = s.title.toLowerCase().includes(search.toLowerCase()) ||
+      s.submittal_number.toLowerCase().includes(search.toLowerCase());
+    const mst = statusFilter === "all" || s.status === statusFilter;
+    return ms && mst;
+  });
+
+  const underReview = submittals.filter(s => s.status === "Under Review").length;
+  const approved = submittals.filter(s => s.status === "Approved").length;
+  const rejected = submittals.filter(s => s.status === "Rejected").length;
+
+  const nextNumber = `SUB-${String(submittals.length + 1).padStart(4, "0")}`;
+
+  const handleSubmit = () => {
+    if (!form.title) return;
+    createSubmittal.mutate({
+      submittal_number: nextNumber,
+      title: form.title,
+      spec_section: form.spec_section || null,
+      submitted_by: form.submitted_by || null,
+      reviewer: form.reviewer || null,
+      due_date: form.due_date || null,
+      status: "Pending",
+      revision: 1,
+    });
+    setOpen(false);
+    setForm({ title: "", spec_section: "", submitted_by: "", reviewer: "", due_date: "" });
+  };
+
   return (
-    <ModulePage
-      title="Submittals"
-      description="Manage submittal logs, approvals, and document workflows."
-      module="SiteSync Build"
-    />
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Submittals</h1>
+            <Badge variant="outline" className="text-[10px]">SiteSync Build</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage submittal logs, approvals, and document workflows.</p>
+        </div>
+        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Submittal</Button>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-bold">{submittals.length}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Under Review</p><p className="text-xl font-bold text-warning">{underReview}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Approved</p><p className="text-xl font-bold text-success">{approved}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Rejected</p><p className="text-xl font-bold text-destructive">{rejected}</p></CardContent></Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search submittals…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Sub #</TableHead>
+                  <TableHead className="text-xs">Title</TableHead>
+                  <TableHead className="text-xs">Spec Section</TableHead>
+                  <TableHead className="text-xs">Rev</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Submitted By</TableHead>
+                  <TableHead className="text-xs">Reviewer</TableHead>
+                  <TableHead className="text-xs">Due Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="text-xs font-mono text-muted-foreground">{s.submittal_number}</TableCell>
+                    <TableCell className="text-sm font-medium max-w-[180px] truncate">{s.title}</TableCell>
+                    <TableCell className="text-sm">{s.spec_section ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-center">r{s.revision}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={s.status}
+                        onValueChange={v => updateSubmittal.mutate({ id: s.id, status: v })}
+                      >
+                        <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
+                          <Badge variant="outline" className={`text-[10px] ${statusColor[s.status] ?? ""}`}>{s.status}</Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-sm">{s.submitted_by ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{s.reviewer ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{s.due_date ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
+                      No submittals found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>New Submittal</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div><Label className="text-xs">Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+            <div><Label className="text-xs">Spec Section</Label><Input value={form.spec_section} onChange={e => setForm(f => ({ ...f, spec_section: e.target.value }))} placeholder="e.g. 03 30 00" /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Submitted By</Label><Input value={form.submitted_by} onChange={e => setForm(f => ({ ...f, submitted_by: e.target.value }))} /></div>
+              <div><Label className="text-xs">Reviewer</Label><Input value={form.reviewer} onChange={e => setForm(f => ({ ...f, reviewer: e.target.value }))} /></div>
+            </div>
+            <div><Label className="text-xs">Due Date</Label><Input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} /></div>
+            <Button className="w-full" onClick={handleSubmit} disabled={!form.title || createSubmittal.isPending}>
+              {createSubmittal.isPending ? "Creating…" : "Create Submittal"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

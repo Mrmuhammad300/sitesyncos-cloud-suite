@@ -9,15 +9,37 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings, User, Bell, Shield, Palette } from "lucide-react";
+import { User, Bell, Palette } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, profile } = useAuth();
-  const [displayName, setDisplayName] = useState(profile?.display_name || "");
+  const { user, profile, updateProfile } = useAuth();
+  const [displayName, setDisplayName] = useState(profile?.display_name ?? "");
+  const [saving, setSaving] = useState(false);
 
-  const handleSaveProfile = () => {
-    toast.success("Profile updated successfully");
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    const { error } = await updateProfile({ display_name: displayName.trim() || null });
+    setSaving(false);
+    if (error) {
+      toast.error(`Failed to save: ${error.message}`);
+    } else {
+      toast.success("Profile updated successfully");
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!user?.email) return;
+    const { error } = await import("@/integrations/supabase/client").then(m =>
+      m.supabase.auth.resetPasswordForEmail(user.email!, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+    );
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset email sent — check your inbox");
+    }
   };
 
   return (
@@ -44,18 +66,26 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Display Name</Label>
-                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="text-sm" />
+                  <Input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="text-sm"
+                    placeholder="Your name"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Email</Label>
-                  <Input value={user?.email || ""} disabled className="text-sm" />
+                  <Input value={user?.email ?? ""} disabled className="text-sm" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Role</Label>
-                <div><Badge variant="outline">{profile?.role || "field_staff"}</Badge></div>
+                <div><Badge variant="outline">{profile?.role ?? "field_staff"}</Badge></div>
+                <p className="text-xs text-muted-foreground">Role changes must be made by an administrator.</p>
               </div>
-              <Button size="sm" onClick={handleSaveProfile}>Save Changes</Button>
+              <Button size="sm" onClick={handleSaveProfile} disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
+              </Button>
             </CardContent>
           </Card>
 
@@ -65,8 +95,12 @@ export default function SettingsPage() {
               <CardDescription className="text-xs">Password and authentication settings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button size="sm" variant="outline">Change Password</Button>
-              <p className="text-xs text-muted-foreground">Two-factor authentication is managed through your email provider.</p>
+              <Button size="sm" variant="outline" onClick={handleChangePassword}>
+                Send Password Reset Email
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                A reset link will be sent to {user?.email ?? "your email"}.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

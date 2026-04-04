@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { TablesInsert } from "@/integrations/supabase/types";
+import { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { uploadFile, buildStoragePath, formatFileSize } from "@/lib/storage";
 import { toast } from "sonner";
 
 export function useBudgets() {
@@ -23,7 +24,7 @@ export function useCreateBudget() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["budgets"] }); toast.success("Budget created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -47,7 +48,7 @@ export function useCreateDrawRequest() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["draw_requests"] }); toast.success("Draw request created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -71,7 +72,7 @@ export function useCreateTenant() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tenants"] }); toast.success("Tenant added"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -95,7 +96,7 @@ export function useCreateWorkOrder() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["work_orders"] }); toast.success("Work order created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -110,15 +111,64 @@ export function useDocuments() {
   });
 }
 
+interface CreateDocumentPayload extends TablesInsert<"documents"> {
+  file?: File;
+}
+
 export function useCreateDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (d: TablesInsert<"documents">) => {
-      const { data, error } = await supabase.from("documents").insert(d).select().single();
+    mutationFn: async ({ file, ...d }: CreateDocumentPayload) => {
+      let file_url: string | null = d.file_url ?? null;
+      let file_size: string | null = d.file_size ?? null;
+
+      if (file) {
+        const path = buildStoragePath("documents", file);
+        file_url = await uploadFile("documents", path, file);
+        file_size = formatFileSize(file.size);
+      }
+
+      const { data, error } = await supabase
+        .from("documents")
+        .insert({ ...d, file_url, file_size })
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["documents"] }); toast.success("Document added"); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["documents"] }); toast.success("Document uploaded"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+interface UpdateDocumentPayload extends TablesUpdate<"documents"> {
+  id: string;
+  file?: File;
+}
+
+export function useUpdateDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file, ...updates }: UpdateDocumentPayload) => {
+      let file_url = updates.file_url;
+      let file_size = updates.file_size;
+
+      if (file) {
+        const path = buildStoragePath("documents", file);
+        file_url = await uploadFile("documents", path, file);
+        file_size = formatFileSize(file.size);
+      }
+
+      const { data, error } = await supabase
+        .from("documents")
+        .update({ ...updates, file_url, file_size })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["documents"] }); toast.success("Document updated"); },
+    onError: (e: Error) => toast.error(e.message),
   });
 }
