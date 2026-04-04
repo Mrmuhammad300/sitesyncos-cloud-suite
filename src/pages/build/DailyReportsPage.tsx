@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, CloudSun, Users, Clock, AlertTriangle, Trash2, Download } from "lucide-react";
+import { Plus, Search, CloudSun, Users, Clock, AlertTriangle, Trash2, Download, Printer } from "lucide-react";
 import { useDailyReports, useCreateDailyReport, useUpdateDailyReport, useDeleteDailyReport } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
-import { exportToCSV } from "@/lib/export";
+import { exportToCSV, printToPDF } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type DailyReport = Database["public"]["Tables"]["daily_reports"]["Row"];
@@ -105,6 +105,21 @@ export default function DailyReportsPage() {
     });
   };
 
+  const handlePrintPDF = () => {
+    const cols = ["Report #", "Date", "Author", "Crew", "Hours", "Weather", "Safety", "Status"];
+    const rows_html = filtered.map(r => `<tr>
+      <td>${r.report_number}</td>
+      <td>${r.report_date}</td>
+      <td>${r.author_name ?? "—"}</td>
+      <td>${r.crew_count}</td>
+      <td>${r.work_hours}h</td>
+      <td>${r.weather ?? "—"}</td>
+      <td>${r.safety_incidents}</td>
+      <td>${r.status}</td>
+    </tr>`).join("");
+    printToPDF("Daily Reports", `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows_html}</tbody></table>`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -116,7 +131,8 @@ export default function DailyReportsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Log daily site activity, crew counts, weather, and field observations.</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" variant="outline" onClick={handlePrintPDF}><Printer className="h-4 w-4 mr-1.5" />PDF</Button>
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />CSV</Button>
           <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />File Report</Button>
         </div>
       </div>

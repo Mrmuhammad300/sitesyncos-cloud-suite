@@ -38,6 +38,8 @@ const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
 const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
 const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
 const SettingsPage = lazy(() => import("@/pages/system/SettingsPage"));
+const TeamPage = lazy(() => import("@/pages/system/TeamPage"));
+const AuditLogPage = lazy(() => import("@/pages/system/AuditLogPage"));
 const CompliancePage = lazy(() => import("@/pages/vault/CompliancePage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -102,6 +104,8 @@ const App = () => (
                         {/* System */}
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/team" element={<TeamPage />} />
+                        <Route path="/audit-log" element={<AuditLogPage />} />
                         {/* Vault extras */}
                         <Route path="/vault/compliance" element={<CompliancePage />} />
                         {/* Stubs (none remaining) */}

@@ -2,7 +2,7 @@ import {
   Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat,
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
-  LayoutDashboard, Settings, Bell, CheckSquare
+  LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -73,6 +73,13 @@ const moduleGroups = [
     items: [
       { title: "3D Viewer", url: "/spatial/viewer", icon: Box },
       { title: "Floor Plans", url: "/spatial/plans", icon: Home },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { title: "Team", url: "/team", icon: UserCog },
+      { title: "Audit Log", url: "/audit-log", icon: ScrollText },
     ],
   },
 ];

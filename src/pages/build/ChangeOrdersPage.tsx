@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ArrowUpRight, Trash2, Download } from "lucide-react";
+import { Plus, Search, ArrowUpRight, Trash2, Download, Printer } from "lucide-react";
 import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder, useDeleteChangeOrder } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
-import { exportToCSV } from "@/lib/export";
+import { exportToCSV, printToPDF } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChangeOrder = Database["public"]["Tables"]["change_orders"]["Row"];
@@ -98,6 +98,20 @@ export default function ChangeOrdersPage() {
     });
   };
 
+  const handlePrintPDF = () => {
+    const cols = ["CO #", "Title", "Category", "Amount", "Days Impact", "Requested By", "Status"];
+    const rows_html = filtered.map(r => `<tr>
+      <td>${r.co_number}</td>
+      <td>${r.title}</td>
+      <td>${r.category ?? "—"}</td>
+      <td>$${Number(r.amount).toLocaleString()}</td>
+      <td>${r.days_impact ?? 0}d</td>
+      <td>${r.requested_by ?? "—"}</td>
+      <td>${r.status}</td>
+    </tr>`).join("");
+    printToPDF("Change Orders", `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows_html}</tbody></table>`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -109,7 +123,8 @@ export default function ChangeOrdersPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Review, approve, and track change orders and cost impacts.</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" variant="outline" onClick={handlePrintPDF}><Printer className="h-4 w-4 mr-1.5" />PDF</Button>
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />CSV</Button>
           <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Change Order</Button>
         </div>
       </div>

@@ -149,8 +149,46 @@ export default function ProjectsPage() {
         </Select>
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Mobile card list (hidden on sm+) */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.map((proj) => (
+          <Card key={proj.id}>
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{proj.name}</p>
+                  {proj.location && <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{proj.location}</p>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Badge variant="outline" className={`text-[10px] ${statusColor[proj.status] ?? ""}`}>{proj.status}</Badge>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{proj.project_manager ?? "No manager"}</span>
+                <span className="font-medium text-foreground">{fmt(Number(proj.budget))}</span>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                  <span>Progress</span><span>{proj.progress}%</span>
+                </div>
+                <Progress value={proj.progress} className="h-1.5" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {!isLoading && rows.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-8">No projects found.</p>
+        )}
+        {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
+      </div>
+
+      {/* Table (hidden on mobile) */}
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
