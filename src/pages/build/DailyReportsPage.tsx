@@ -79,7 +79,6 @@ export default function DailyReportsPage() {
       summary: form.summary || null,
       safety_incidents: Number(form.safety_incidents) || 0,
       delay_hours: 0,
-      status: "Draft",
     });
     setOpen(false);
     setForm({
