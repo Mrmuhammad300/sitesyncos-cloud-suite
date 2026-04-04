@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Home, ZoomIn, ZoomOut, Maximize2, Grid3X3, Ruler } from "lucide-react";
+import { Home, ZoomIn, ZoomOut, Maximize2, Grid3X3, Ruler, Wand2, CheckCircle2, XCircle } from "lucide-react";
+import { useFloorPlanVariants, useUpdateFloorPlanVariant } from "@/hooks/useBlenderData";
 
 const mockFloors = [
   { id: "b1", label: "Basement 1", rooms: 8, area: "4,200 sqft", status: "Final" },
@@ -28,6 +30,9 @@ const mockRooms = [
 export default function FloorPlansPage() {
   const [selectedFloor, setSelectedFloor] = useState("g");
   const floor = mockFloors.find((f) => f.id === selectedFloor)!;
+  const navigate = useNavigate();
+  const { data: variants } = useFloorPlanVariants();
+  const updateVariant = useUpdateFloorPlanVariant();
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -39,14 +44,19 @@ export default function FloorPlansPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Generate and review parametric floor plans for each level.</p>
         </div>
-        <Select value={selectedFloor} onValueChange={setSelectedFloor}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {mockFloors.map((f) => (
-              <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate("/spatial/generator")} className="text-xs">
+            <Wand2 className="h-3.5 w-3.5 mr-1.5" /> Generate with AI
+          </Button>
+          <Select value={selectedFloor} onValueChange={setSelectedFloor}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {mockFloors.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -135,6 +145,52 @@ export default function FloorPlansPage() {
           </Card>
         </div>
       </div>
+
+      {/* AI-generated variants */}
+      {variants && variants.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Wand2 className="h-4 w-4 text-blue-500" /> AI-Generated Variants ({variants.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {variants.map((v) => (
+                <div key={v.id} className="shrink-0 w-48 border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium">{v.variant_name ?? `Variant ${v.variant_number}`}</span>
+                    <Badge variant="outline" className={`text-[9px] ${
+                      v.status === "approved" ? "border-emerald-500/30 text-emerald-600" :
+                      v.status === "rejected" ? "border-destructive/30 text-destructive" :
+                      "border-muted"
+                    }`}>{v.status}</Badge>
+                  </div>
+                  {v.metrics && (
+                    <div className="text-[10px] text-muted-foreground space-y-0.5">
+                      <div>{v.metrics.total_area?.toLocaleString()} sqft</div>
+                      <div>{v.metrics.room_count} rooms</div>
+                      <div>Efficiency: {Math.round((v.metrics.efficiency_ratio ?? 0) * 100)}%</div>
+                    </div>
+                  )}
+                  {v.status === "draft" && (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="flex-1 h-6 text-[10px] text-emerald-600 border-emerald-500/30"
+                        onClick={() => updateVariant.mutate({ id: v.id, status: "approved" })}>
+                        <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 h-6 text-[10px] text-destructive border-destructive/30"
+                        onClick={() => updateVariant.mutate({ id: v.id, status: "rejected" })}>
+                        <XCircle className="h-3 w-3 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Room schedule */}
       <Card>

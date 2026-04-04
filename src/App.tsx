@@ -37,6 +37,9 @@ const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
 const AIAssistantPage = lazy(() => import("@/pages/ai/AIAssistantPage"));
 const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
 const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
+const GeneratorPage = lazy(() => import("@/pages/spatial/GeneratorPage"));
+const ClashAnalysisPage = lazy(() => import("@/pages/spatial/ClashAnalysisPage"));
+const DesignAssistantPage = lazy(() => import("@/pages/spatial/DesignAssistantPage"));
 const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
 const SettingsPage = lazy(() => import("@/pages/system/SettingsPage"));
 const TeamPage = lazy(() => import("@/pages/system/TeamPage"));
@@ -111,6 +114,9 @@ const App = () => (
                         {/* Spatial */}
                         <Route path="/spatial/viewer" element={<ViewerPage />} />
                         <Route path="/spatial/plans" element={<FloorPlansPage />} />
+                        <Route path="/spatial/generator" element={<GeneratorPage />} />
+                        <Route path="/spatial/clash" element={<ClashAnalysisPage />} />
+                        <Route path="/spatial/design-assistant" element={<DesignAssistantPage />} />
                         {/* System */}
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
