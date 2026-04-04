@@ -104,7 +104,7 @@ export default function DailyReportsPage() {
   };
 
   const handlePrintPDF = () => {
-    const cols = ["Report #", "Date", "Author", "Crew", "Hours", "Weather", "Safety", "Status"];
+    const cols = ["Report #", "Date", "Author", "Crew", "Hours", "Weather", "Safety"];
     const rows_html = filtered.map(r => `<tr>
       <td>${r.report_number}</td>
       <td>${r.report_date}</td>
@@ -113,7 +113,6 @@ export default function DailyReportsPage() {
       <td>${r.work_hours}h</td>
       <td>${r.weather ?? "—"}</td>
       <td>${r.safety_incidents}</td>
-      <td>${r.status}</td>
     </tr>`).join("");
     printToPDF("Daily Reports", `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows_html}</tbody></table>`);
   };
