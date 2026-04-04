@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
-// Projects
+// ─── Projects ────────────────────────────────────────────────────────────────
+
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
@@ -24,7 +25,7 @@ export function useCreateProject() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Project created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -37,11 +38,24 @@ export function useUpdateProject() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Project updated"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
-// RFIs
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Project deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── RFIs ─────────────────────────────────────────────────────────────────────
+
 export function useRFIs() {
   return useQuery({
     queryKey: ["rfis"],
@@ -62,7 +76,7 @@ export function useCreateRFI() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfis"] }); toast.success("RFI created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -75,11 +89,24 @@ export function useUpdateRFI() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfis"] }); toast.success("RFI updated"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
-// Submittals
+export function useDeleteRFI() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("rfis").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfis"] }); toast.success("RFI deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── Submittals ───────────────────────────────────────────────────────────────
+
 export function useSubmittals() {
   return useQuery({
     queryKey: ["submittals"],
@@ -100,7 +127,7 @@ export function useCreateSubmittal() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["submittals"] }); toast.success("Submittal created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -113,11 +140,24 @@ export function useUpdateSubmittal() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["submittals"] }); toast.success("Submittal updated"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
-// Change Orders
+export function useDeleteSubmittal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("submittals").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["submittals"] }); toast.success("Submittal deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── Change Orders ────────────────────────────────────────────────────────────
+
 export function useChangeOrders() {
   return useQuery({
     queryKey: ["change_orders"],
@@ -138,7 +178,7 @@ export function useCreateChangeOrder() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["change_orders"] }); toast.success("Change order created"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -151,11 +191,24 @@ export function useUpdateChangeOrder() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["change_orders"] }); toast.success("Change order updated"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
-// Daily Reports
+export function useDeleteChangeOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("change_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["change_orders"] }); toast.success("Change order deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── Daily Reports ────────────────────────────────────────────────────────────
+
 export function useDailyReports() {
   return useQuery({
     queryKey: ["daily_reports"],
@@ -176,7 +229,7 @@ export function useCreateDailyReport() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["daily_reports"] }); toast.success("Report submitted"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -189,6 +242,21 @@ export function useUpdateDailyReport() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["daily_reports"] }); toast.success("Report updated"); },
-    onError: (e) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
+
+export function useDeleteDailyReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("daily_reports").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["daily_reports"] }); toast.success("Report deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// Re-export Tables type for convenience
+export type { Tables };

@@ -1,18 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 type PropertyInsert = Database["public"]["Tables"]["properties"]["Insert"];
 type PropertyUpdate = Database["public"]["Tables"]["properties"]["Update"] & { id: string };
-
 type LenderInsert = Database["public"]["Tables"]["lenders"]["Insert"];
 type LenderUpdate = Database["public"]["Tables"]["lenders"]["Update"] & { id: string };
-
 type TreasuryInsert = Database["public"]["Tables"]["treasury_transactions"]["Insert"];
 type TreasuryUpdate = Database["public"]["Tables"]["treasury_transactions"]["Update"] & { id: string };
 
-// Properties
+// ─── Properties ───────────────────────────────────────────────────────────────
+
 export function useProperties() {
   return useQuery({
     queryKey: ["properties"],
@@ -50,7 +49,20 @@ export function useUpdateProperty() {
   });
 }
 
-// Lenders
+export function useDeleteProperty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("properties").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["properties"] }); toast.success("Property deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── Lenders ──────────────────────────────────────────────────────────────────
+
 export function useLenders() {
   return useQuery({
     queryKey: ["lenders"],
@@ -88,7 +100,20 @@ export function useUpdateLender() {
   });
 }
 
-// Treasury Transactions
+export function useDeleteLender() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("lenders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lenders"] }); toast.success("Lender deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ─── Treasury Transactions ────────────────────────────────────────────────────
+
 export function useTreasuryTransactions() {
   return useQuery({
     queryKey: ["treasury_transactions"],
@@ -122,6 +147,18 @@ export function useUpdateTreasuryTransaction() {
       return data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["treasury_transactions"] }); toast.success("Transaction updated"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTreasuryTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("treasury_transactions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["treasury_transactions"] }); toast.success("Transaction deleted"); },
     onError: (e: Error) => toast.error(e.message),
   });
 }

@@ -4,11 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, CloudSun, Users, Clock, AlertTriangle } from "lucide-react";
-import { useDailyReports, useCreateDailyReport, useUpdateDailyReport } from "@/hooks/useProjectData";
+import { Plus, Search, CloudSun, Users, Clock, AlertTriangle, Trash2, Download } from "lucide-react";
+import { useDailyReports, useCreateDailyReport, useUpdateDailyReport, useDeleteDailyReport } from "@/hooks/useProjectData";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { exportToCSV } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type DailyReport = Database["public"]["Tables"]["daily_reports"]["Row"];
@@ -26,20 +33,17 @@ export default function DailyReportsPage() {
   const { data: reports = [], isLoading } = useDailyReports();
   const createReport = useCreateDailyReport();
   const updateReport = useUpdateDailyReport();
+  const deleteReport = useDeleteDailyReport();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
-    author_name: "",
-    crew_count: "",
-    work_hours: "",
-    weather: "Clear" as string,
-    temp_high: "",
-    temp_low: "",
-    summary: "",
-    safety_incidents: "0",
+    author_name: "", crew_count: "", work_hours: "",
+    weather: "Clear" as string, temp_high: "", temp_low: "",
+    summary: "", safety_incidents: "0",
   });
 
   const filtered = reports.filter(r => {
@@ -49,11 +53,18 @@ export default function DailyReportsPage() {
     return ms && mst;
   });
 
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+    selected, selectedItems, selectedCount,
+    toggleSelect, toggleSelectAll, clearSelection,
+    isAllSelected, isIndeterminate,
+  } = useTableFeatures<DailyReport>(filtered, { pageSize: 25 });
+
   const totalCrewDays = reports.reduce((s, r) => s + r.crew_count, 0);
   const totalWorkHours = reports.reduce((s, r) => s + r.work_hours, 0);
   const totalSafetyIncidents = reports.reduce((s, r) => s + r.safety_incidents, 0);
   const avgCrew = reports.length ? Math.round(totalCrewDays / reports.length) : 0;
-
   const nextNumber = `DR-${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, "0")}`;
 
   const handleSubmit = () => {
@@ -74,14 +85,23 @@ export default function DailyReportsPage() {
     setOpen(false);
     setForm({
       report_date: new Date().toISOString().slice(0, 10),
-      author_name: "",
-      crew_count: "",
-      work_hours: "",
-      weather: "Clear",
-      temp_high: "",
-      temp_low: "",
-      summary: "",
-      safety_incidents: "0",
+      author_name: "", crew_count: "", work_hours: "",
+      weather: "Clear", temp_high: "", temp_low: "",
+      summary: "", safety_incidents: "0",
+    });
+  };
+
+  const handleBulkStatusUpdate = (status: string) => {
+    selectedItems.forEach(r => updateReport.mutate({ id: r.id, status }));
+    clearSelection();
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "daily-reports", {
+      report_number: "Report #", report_date: "Date", author_name: "Author",
+      crew_count: "Crew", work_hours: "Hours", weather: "Weather",
+      temp_high: "Temp High", temp_low: "Temp Low",
+      safety_incidents: "Safety Incidents", status: "Status",
     });
   };
 
@@ -95,7 +115,10 @@ export default function DailyReportsPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Log daily site activity, crew counts, weather, and field observations.</p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />File Report</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />File Report</Button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -147,61 +170,86 @@ export default function DailyReportsPage() {
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Report #</TableHead>
-                  <TableHead className="text-xs">Date</TableHead>
-                  <TableHead className="text-xs">Author</TableHead>
-                  <TableHead className="text-xs">Crew</TableHead>
-                  <TableHead className="text-xs">Hours</TableHead>
-                  <TableHead className="text-xs">Weather</TableHead>
-                  <TableHead className="text-xs">Safety</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{r.report_number}</TableCell>
-                    <TableCell className="text-sm">{r.report_date}</TableCell>
-                    <TableCell className="text-sm">{r.author_name ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-center">{r.crew_count}</TableCell>
-                    <TableCell className="text-sm text-center">{r.work_hours}h</TableCell>
-                    <TableCell className="text-sm">
-                      {r.weather
-                        ? `${r.weather}${r.temp_high ? ` ${r.temp_high}°/${r.temp_low ?? "—"}°` : ""}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-center">
-                      {r.safety_incidents > 0
-                        ? <span className="text-destructive font-medium">{r.safety_incidents}</span>
-                        : <span className="text-success">0</span>}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={r.status}
-                        onValueChange={v => updateReport.mutate({ id: r.id, status: v })}
-                      >
-                        <SelectTrigger className="h-7 w-[110px] text-[10px] border-0 p-0">
-                          <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
-                      No reports found.
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                    <SortableHeader label="Report #" sortKey="report_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <SortableHeader label="Date" sortKey="report_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <SortableHeader label="Author" sortKey="author_name" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <SortableHeader label="Crew" sortKey="crew_count" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <SortableHeader label="Hours" sortKey="work_hours" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <TableHead className="text-xs">Weather</TableHead>
+                    <SortableHeader label="Safety" sortKey="safety_incidents" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <TableHead className="w-10" />
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.id} data-selected={selected.has(r.id)}>
+                      <TableCell>
+                        <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleSelect(r.id)} />
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{r.report_number}</TableCell>
+                      <TableCell className="text-sm">{r.report_date}</TableCell>
+                      <TableCell className="text-sm">{r.author_name ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-center">{r.crew_count}</TableCell>
+                      <TableCell className="text-sm text-center">{r.work_hours}h</TableCell>
+                      <TableCell className="text-sm">
+                        {r.weather
+                          ? `${r.weather}${r.temp_high ? ` ${r.temp_high}°/${r.temp_low ?? "—"}°` : ""}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
+                        {r.safety_incidents > 0
+                          ? <span className="text-destructive font-medium">{r.safety_incidents}</span>
+                          : <span className="text-success">0</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={r.status}
+                          onValueChange={v => updateReport.mutate({ id: r.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[110px] text-[10px] border-0 p-0">
+                            <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteId(r.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
+                        No reports found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -238,6 +286,36 @@ export default function DailyReportsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Report?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteReport.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        count={selectedCount}
+        onClear={clearSelection}
+        actions={[
+          { label: "Draft", onClick: () => handleBulkStatusUpdate("Draft") },
+          { label: "Submitted", onClick: () => handleBulkStatusUpdate("Submitted") },
+          { label: "Approved", onClick: () => handleBulkStatusUpdate("Approved") },
+        ]}
+      />
     </div>
   );
 }

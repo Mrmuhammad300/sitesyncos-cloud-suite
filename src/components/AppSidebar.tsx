@@ -1,8 +1,8 @@
 import {
-  Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat, 
+  Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat,
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
-  LayoutDashboard, Settings, Bell
+  LayoutDashboard, Settings, Bell, CheckSquare
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -39,6 +39,7 @@ const moduleGroups = [
       { title: "Change Orders", url: "/build/change-orders", icon: Layers },
       { title: "Daily Reports", url: "/build/daily-reports", icon: Activity },
       { title: "Schedule", url: "/build/schedule", icon: BarChart3 },
+      { title: "Punch List", url: "/build/punch-list", icon: CheckSquare },
     ],
   },
   {

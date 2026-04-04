@@ -4,11 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ArrowUpRight } from "lucide-react";
-import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder } from "@/hooks/useProjectData";
+import { Plus, Search, ArrowUpRight, Trash2, Download } from "lucide-react";
+import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder, useDeleteChangeOrder } from "@/hooks/useProjectData";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { exportToCSV } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChangeOrder = Database["public"]["Tables"]["change_orders"]["Row"];
@@ -29,17 +36,15 @@ export default function ChangeOrdersPage() {
   const { data: changeOrders = [], isLoading } = useChangeOrders();
   const createCO = useCreateChangeOrder();
   const updateCO = useUpdateChangeOrder();
+  const deleteCO = useDeleteChangeOrder();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    title: "",
-    amount: "",
-    days_impact: "",
-    category: "Scope Addition" as string,
-    reason: "",
-    requested_by: "",
+    title: "", amount: "", days_impact: "",
+    category: "Scope Addition" as string, reason: "", requested_by: "",
   });
 
   const filtered = changeOrders.filter(co => {
@@ -49,12 +54,19 @@ export default function ChangeOrdersPage() {
     return ms && mst;
   });
 
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+    selected, selectedItems, selectedCount,
+    toggleSelect, toggleSelectAll, clearSelection,
+    isAllSelected, isIndeterminate,
+  } = useTableFeatures<ChangeOrder>(filtered, { pageSize: 25 });
+
   const totalValue = changeOrders.reduce((s, co) => s + Number(co.amount), 0);
   const approvedValue = changeOrders
     .filter(co => co.status === "Approved")
     .reduce((s, co) => s + Number(co.amount), 0);
   const pendingCount = changeOrders.filter(co => co.status === "Pending").length;
-
   const nextNumber = `CO-${String(changeOrders.length + 1).padStart(4, "0")}`;
 
   const handleSubmit = () => {
@@ -73,6 +85,19 @@ export default function ChangeOrdersPage() {
     setForm({ title: "", amount: "", days_impact: "", category: "Scope Addition", reason: "", requested_by: "" });
   };
 
+  const handleBulkStatusUpdate = (status: string) => {
+    selectedItems.forEach(co => updateCO.mutate({ id: co.id, status }));
+    clearSelection();
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "change-orders", {
+      co_number: "CO #", title: "Title", category: "Category",
+      amount: "Amount", days_impact: "Days Impact", status: "Status",
+      requested_by: "Requested By",
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -83,7 +108,10 @@ export default function ChangeOrdersPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Review, approve, and track change orders and cost impacts.</p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Change Order</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Change Order</Button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -122,58 +150,83 @@ export default function ChangeOrdersPage() {
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">CO #</TableHead>
-                  <TableHead className="text-xs">Title</TableHead>
-                  <TableHead className="text-xs">Category</TableHead>
-                  <TableHead className="text-xs">Amount</TableHead>
-                  <TableHead className="text-xs">Days Impact</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Requested By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((co) => (
-                  <TableRow key={co.id}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{co.co_number}</TableCell>
-                    <TableCell>
-                      <p className="text-sm font-medium">{co.title}</p>
-                      {co.reason && <p className="text-xs text-muted-foreground truncate max-w-xs">{co.reason}</p>}
-                    </TableCell>
-                    <TableCell className="text-sm">{co.category ?? "—"}</TableCell>
-                    <TableCell className="text-sm font-medium">{fmt(Number(co.amount))}</TableCell>
-                    <TableCell className="text-sm text-center">
-                      {Number(co.days_impact) > 0
-                        ? <span className="text-warning">+{co.days_impact}d</span>
-                        : <span className="text-muted-foreground">{co.days_impact}d</span>}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={co.status}
-                        onValueChange={v => updateCO.mutate({ id: co.id, status: v })}
-                      >
-                        <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
-                          <Badge variant="outline" className={`text-[10px] ${statusColor[co.status] ?? ""}`}>{co.status}</Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-sm">{co.requested_by ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                      No change orders found.
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                    <SortableHeader label="CO #" sortKey="co_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Category" sortKey="category" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Amount" sortKey="amount" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Days" sortKey="days_impact" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <SortableHeader label="Requested By" sortKey="requested_by" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
+                    <TableHead className="w-10" />
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((co) => (
+                    <TableRow key={co.id} data-selected={selected.has(co.id)}>
+                      <TableCell>
+                        <Checkbox checked={selected.has(co.id)} onCheckedChange={() => toggleSelect(co.id)} />
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{co.co_number}</TableCell>
+                      <TableCell>
+                        <p className="text-sm font-medium">{co.title}</p>
+                        {co.reason && <p className="text-xs text-muted-foreground truncate max-w-xs">{co.reason}</p>}
+                      </TableCell>
+                      <TableCell className="text-sm">{co.category ?? "—"}</TableCell>
+                      <TableCell className="text-sm font-medium">{fmt(Number(co.amount))}</TableCell>
+                      <TableCell className="text-sm text-center">
+                        {Number(co.days_impact) > 0
+                          ? <span className="text-warning">+{co.days_impact}d</span>
+                          : <span className="text-muted-foreground">{co.days_impact}d</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={co.status}
+                          onValueChange={v => updateCO.mutate({ id: co.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
+                            <Badge variant="outline" className={`text-[10px] ${statusColor[co.status] ?? ""}`}>{co.status}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-sm">{co.requested_by ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteId(co.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">
+                        No change orders found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -203,6 +256,36 @@ export default function ChangeOrdersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Change Order?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteCO.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        count={selectedCount}
+        onClear={clearSelection}
+        actions={[
+          { label: "Under Review", onClick: () => handleBulkStatusUpdate("Under Review") },
+          { label: "Approved", onClick: () => handleBulkStatusUpdate("Approved") },
+          { label: "Rejected", onClick: () => handleBulkStatusUpdate("Rejected") },
+        ]}
+      />
     </div>
   );
 }

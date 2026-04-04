@@ -1,14 +1,21 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search } from "lucide-react";
-import { useRFIs, useCreateRFI, useUpdateRFI } from "@/hooks/useProjectData";
+import { Plus, Search, Trash2, Download } from "lucide-react";
+import { useRFIs, useCreateRFI, useUpdateRFI, useDeleteRFI } from "@/hooks/useProjectData";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { exportToCSV } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type RFI = Database["public"]["Tables"]["rfis"]["Row"];
@@ -33,10 +40,12 @@ export default function RFIsPage() {
   const { data: rfis = [], isLoading } = useRFIs();
   const createRFI = useCreateRFI();
   const updateRFI = useUpdateRFI();
+  const deleteRFI = useDeleteRFI();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ subject: "", description: "", priority: "Medium", assigned_to: "", due_date: "" });
 
   const filtered = rfis.filter(r => {
@@ -45,6 +54,14 @@ export default function RFIsPage() {
     const mst = statusFilter === "all" || r.status === statusFilter;
     return ms && mst;
   });
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+    selected, selectedItems, selectedCount,
+    toggleSelect, toggleSelectAll, clearSelection,
+    isAllSelected, isIndeterminate,
+  } = useTableFeatures<RFI>(filtered, { pageSize: 25 });
 
   const openCount = rfis.filter(r => r.status === "Open").length;
   const inReviewCount = rfis.filter(r => r.status === "In Review").length;
@@ -67,6 +84,18 @@ export default function RFIsPage() {
     setForm({ subject: "", description: "", priority: "Medium", assigned_to: "", due_date: "" });
   };
 
+  const handleBulkStatusUpdate = (status: string) => {
+    selectedItems.forEach(r => updateRFI.mutate({ id: r.id, status }));
+    clearSelection();
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "rfis", {
+      rfi_number: "RFI #", subject: "Subject", priority: "Priority",
+      status: "Status", assigned_to: "Assigned To", due_date: "Due Date",
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -77,7 +106,10 @@ export default function RFIsPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Track and resolve Requests for Information.</p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New RFI</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New RFI</Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -109,54 +141,79 @@ export default function RFIsPage() {
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">RFI #</TableHead>
-                  <TableHead className="text-xs">Subject</TableHead>
-                  <TableHead className="text-xs">Priority</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Assigned To</TableHead>
-                  <TableHead className="text-xs">Due Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((rfi) => (
-                  <TableRow key={rfi.id}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{rfi.rfi_number}</TableCell>
-                    <TableCell>
-                      <p className="text-sm font-medium">{rfi.subject}</p>
-                      {rfi.description && <p className="text-xs text-muted-foreground truncate max-w-xs">{rfi.description}</p>}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`text-[10px] ${priorityColor[rfi.priority] ?? ""}`}>{rfi.priority}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={rfi.status}
-                        onValueChange={v => updateRFI.mutate({ id: rfi.id, status: v })}
-                      >
-                        <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
-                          <Badge variant="outline" className={`text-[10px] ${statusColor[rfi.status] ?? ""}`}>{rfi.status}</Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-sm">{rfi.assigned_to ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{rfi.due_date ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                      No RFIs found.
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                    <SortableHeader label="RFI #" sortKey="rfi_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <SortableHeader label="Subject" sortKey="subject" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <SortableHeader label="Priority" sortKey="priority" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <SortableHeader label="Assigned To" sortKey="assigned_to" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <SortableHeader label="Due Date" sortKey="due_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof RFI)} />
+                    <TableHead className="w-10" />
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((rfi) => (
+                    <TableRow key={rfi.id} data-selected={selected.has(rfi.id)}>
+                      <TableCell>
+                        <Checkbox checked={selected.has(rfi.id)} onCheckedChange={() => toggleSelect(rfi.id)} />
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{rfi.rfi_number}</TableCell>
+                      <TableCell>
+                        <p className="text-sm font-medium">{rfi.subject}</p>
+                        {rfi.description && <p className="text-xs text-muted-foreground truncate max-w-xs">{rfi.description}</p>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] ${priorityColor[rfi.priority] ?? ""}`}>{rfi.priority}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={rfi.status}
+                          onValueChange={v => updateRFI.mutate({ id: rfi.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
+                            <Badge variant="outline" className={`text-[10px] ${statusColor[rfi.status] ?? ""}`}>{rfi.status}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-sm">{rfi.assigned_to ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{rfi.due_date ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteId(rfi.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
+                        No RFIs found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -185,6 +242,37 @@ export default function RFIsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete RFI?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteRFI.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        count={selectedCount}
+        onClear={clearSelection}
+        actions={[
+          { label: "Open", onClick: () => handleBulkStatusUpdate("Open") },
+          { label: "In Review", onClick: () => handleBulkStatusUpdate("In Review") },
+          { label: "Answered", onClick: () => handleBulkStatusUpdate("Answered") },
+          { label: "Closed", onClick: () => handleBulkStatusUpdate("Closed") },
+        ]}
+      />
     </div>
   );
 }

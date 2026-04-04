@@ -172,3 +172,76 @@ export function useUpdateDocument() {
     onError: (e: Error) => toast.error(e.message),
   });
 }
+
+export function useDeleteBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("budgets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budgets"] }); toast.success("Budget deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteDrawRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("draw_requests").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["draw_requests"] }); toast.success("Draw request deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tenants").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tenants"] }); toast.success("Tenant deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"work_orders"> & { id: string }) => {
+      const { data, error } = await supabase.from("work_orders").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["work_orders"] }); toast.success("Work order updated"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("work_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["work_orders"] }); toast.success("Work order deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("documents").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["documents"] }); toast.success("Document deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}

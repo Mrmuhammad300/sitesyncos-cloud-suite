@@ -4,11 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search } from "lucide-react";
-import { useSubmittals, useCreateSubmittal, useUpdateSubmittal } from "@/hooks/useProjectData";
+import { Plus, Search, Trash2, Download } from "lucide-react";
+import { useSubmittals, useCreateSubmittal, useUpdateSubmittal, useDeleteSubmittal } from "@/hooks/useProjectData";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { exportToCSV } from "@/lib/export";
 import type { Database } from "@/integrations/supabase/types";
 
 type Submittal = Database["public"]["Tables"]["submittals"]["Row"];
@@ -27,16 +34,14 @@ export default function SubmittalsPage() {
   const { data: submittals = [], isLoading } = useSubmittals();
   const createSubmittal = useCreateSubmittal();
   const updateSubmittal = useUpdateSubmittal();
+  const deleteSubmittal = useDeleteSubmittal();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    title: "",
-    spec_section: "",
-    submitted_by: "",
-    reviewer: "",
-    due_date: "",
+    title: "", spec_section: "", submitted_by: "", reviewer: "", due_date: "",
   });
 
   const filtered = submittals.filter(s => {
@@ -46,10 +51,17 @@ export default function SubmittalsPage() {
     return ms && mst;
   });
 
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+    selected, selectedItems, selectedCount,
+    toggleSelect, toggleSelectAll, clearSelection,
+    isAllSelected, isIndeterminate,
+  } = useTableFeatures<Submittal>(filtered, { pageSize: 25 });
+
   const underReview = submittals.filter(s => s.status === "Under Review").length;
   const approved = submittals.filter(s => s.status === "Approved").length;
   const rejected = submittals.filter(s => s.status === "Rejected").length;
-
   const nextNumber = `SUB-${String(submittals.length + 1).padStart(4, "0")}`;
 
   const handleSubmit = () => {
@@ -68,6 +80,19 @@ export default function SubmittalsPage() {
     setForm({ title: "", spec_section: "", submitted_by: "", reviewer: "", due_date: "" });
   };
 
+  const handleBulkStatusUpdate = (status: string) => {
+    selectedItems.forEach(s => updateSubmittal.mutate({ id: s.id, status }));
+    clearSelection();
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "submittals", {
+      submittal_number: "Sub #", title: "Title", spec_section: "Spec Section",
+      revision: "Rev", status: "Status", submitted_by: "Submitted By",
+      reviewer: "Reviewer", due_date: "Due Date",
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -78,7 +103,10 @@ export default function SubmittalsPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Manage submittal logs, approvals, and document workflows.</p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Submittal</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Submittal</Button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -110,53 +138,76 @@ export default function SubmittalsPage() {
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Sub #</TableHead>
-                  <TableHead className="text-xs">Title</TableHead>
-                  <TableHead className="text-xs">Spec Section</TableHead>
-                  <TableHead className="text-xs">Rev</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Submitted By</TableHead>
-                  <TableHead className="text-xs">Reviewer</TableHead>
-                  <TableHead className="text-xs">Due Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{s.submittal_number}</TableCell>
-                    <TableCell className="text-sm font-medium max-w-[180px] truncate">{s.title}</TableCell>
-                    <TableCell className="text-sm">{s.spec_section ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-center">r{s.revision}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={s.status}
-                        onValueChange={v => updateSubmittal.mutate({ id: s.id, status: v })}
-                      >
-                        <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
-                          <Badge variant="outline" className={`text-[10px] ${statusColor[s.status] ?? ""}`}>{s.status}</Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-sm">{s.submitted_by ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{s.reviewer ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{s.due_date ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
-                      No submittals found.
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                    <SortableHeader label="Sub #" sortKey="submittal_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <SortableHeader label="Spec Section" sortKey="spec_section" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <TableHead className="text-xs">Rev</TableHead>
+                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <SortableHeader label="Submitted By" sortKey="submitted_by" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <SortableHeader label="Due Date" sortKey="due_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Submittal)} />
+                    <TableHead className="w-10" />
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((s) => (
+                    <TableRow key={s.id} data-selected={selected.has(s.id)}>
+                      <TableCell>
+                        <Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggleSelect(s.id)} />
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{s.submittal_number}</TableCell>
+                      <TableCell className="text-sm font-medium max-w-[180px] truncate">{s.title}</TableCell>
+                      <TableCell className="text-sm">{s.spec_section ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-center">r{s.revision}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={s.status}
+                          onValueChange={v => updateSubmittal.mutate({ id: s.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
+                            <Badge variant="outline" className={`text-[10px] ${statusColor[s.status] ?? ""}`}>{s.status}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-sm">{s.submitted_by ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{s.due_date ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteId(s.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">
+                        No submittals found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -179,6 +230,37 @@ export default function SubmittalsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Submittal?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteSubmittal.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        count={selectedCount}
+        onClear={clearSelection}
+        actions={[
+          { label: "Under Review", onClick: () => handleBulkStatusUpdate("Under Review") },
+          { label: "Approved", onClick: () => handleBulkStatusUpdate("Approved") },
+          { label: "Rejected", onClick: () => handleBulkStatusUpdate("Rejected") },
+          { label: "Resubmit", onClick: () => handleBulkStatusUpdate("Resubmit") },
+        ]}
+      />
     </div>
   );
 }

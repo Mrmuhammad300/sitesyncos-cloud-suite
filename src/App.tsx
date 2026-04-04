@@ -20,6 +20,7 @@ const RFIsPage = lazy(() => import("@/pages/build/RFIsPage"));
 const SubmittalsPage = lazy(() => import("@/pages/build/SubmittalsPage"));
 const ChangeOrdersPage = lazy(() => import("@/pages/build/ChangeOrdersPage"));
 const DailyReportsPage = lazy(() => import("@/pages/build/DailyReportsPage"));
+const PunchListPage = lazy(() => import("@/pages/build/PunchListPage"));
 const PropertiesPage = lazy(() => import("@/pages/vault/PropertiesPage"));
 const ROICalculatorPage = lazy(() => import("@/pages/vault/ROICalculatorPage"));
 const LenderPortalPage = lazy(() => import("@/pages/vault/LenderPortalPage"));
@@ -79,6 +80,7 @@ const App = () => (
                         <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
                         <Route path="/build/daily-reports" element={<DailyReportsPage />} />
                         <Route path="/build/schedule" element={<SchedulePage />} />
+                        <Route path="/build/punch-list" element={<PunchListPage />} />
                         {/* Ops */}
                         <Route path="/ops/budgets" element={<BudgetsPage />} />
                         <Route path="/ops/draws" element={<DrawRequestsPage />} />

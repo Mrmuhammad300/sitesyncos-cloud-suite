@@ -8,9 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FolderOpen, FileText, File, Image, FileSpreadsheet, Upload, Download, X } from "lucide-react";
-import { useDocuments, useCreateDocument } from "@/hooks/useOpsData";
+import { Search, Plus, FolderOpen, FileText, File, Image, FileSpreadsheet, Upload, Download, X, Trash2 } from "lucide-react";
+import { useDocuments, useCreateDocument, useDeleteDocument } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { exportToCSV } from "@/lib/export";
 
 const statusColor: Record<string, string> = {
   Draft: "bg-muted text-muted-foreground",
@@ -31,6 +36,8 @@ const typeIcon: Record<string, React.ReactNode> = {
 const DOC_TYPES = ["Drawing", "Specification", "Report", "Contract", "General"] as const;
 const STATUSES = ["All", "Draft", "Under Review", "Approved", "Superseded", "Archived"] as const;
 
+type DocRecord = Tables<"documents">;
+
 const DocumentsPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
@@ -43,10 +50,12 @@ const DocumentsPage = () => {
     uploaded_by: "",
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: docs = [], isLoading } = useDocuments();
   const createDoc = useCreateDocument();
+  const deleteDoc = useDeleteDocument();
 
   const filtered = docs.filter(
     (d) =>
@@ -54,6 +63,18 @@ const DocumentsPage = () => {
       (d.title.toLowerCase().includes(search.toLowerCase()) ||
         d.doc_number.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+  } = useTableFeatures<DocRecord>(filtered, { pageSize: 25 });
+
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "documents", {
+      doc_number: "Doc #", title: "Title", doc_type: "Type", status: "Status",
+      version: "Version", file_size: "Size", uploaded_by: "Uploaded By",
+    });
+  };
 
   const kpis = [
     { label: "Total Documents", value: docs.length, icon: <FolderOpen className="h-5 w-5 text-primary" /> },
@@ -108,9 +129,12 @@ const DocumentsPage = () => {
           <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
           <p className="text-sm text-muted-foreground">Document management with versioning and file storage.</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />Upload Document
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />Upload Document
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -152,21 +176,22 @@ const DocumentsPage = () => {
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Doc #</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableHeader label="Doc #" sortKey="doc_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DocRecord)} />
+                  <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DocRecord)} />
+                  <SortableHeader label="Type" sortKey="doc_type" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DocRecord)} />
+                  <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DocRecord)} />
                   <TableHead>Version</TableHead>
                   <TableHead>Size</TableHead>
-                  <TableHead>Uploaded By</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <SortableHeader label="Uploaded By" sortKey="uploaded_by" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DocRecord)} />
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((d) => (
+                {rows.map((d) => (
                   <TableRow key={d.id} className="cursor-pointer" onClick={() => setDetail(d)}>
                     <TableCell className="font-mono text-xs">{d.doc_number}</TableCell>
                     <TableCell className="font-medium max-w-[220px] truncate">{d.title}</TableCell>
@@ -181,17 +206,22 @@ const DocumentsPage = () => {
                     <TableCell className="text-xs text-muted-foreground">{d.file_size ?? "—"}</TableCell>
                     <TableCell>{d.uploaded_by ?? "—"}</TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
-                      {d.file_url ? (
-                        <a href={d.file_url} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </a>
-                      ) : null}
+                      <div className="flex items-center gap-1">
+                        {d.file_url ? (
+                          <a href={d.file_url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        ) : null}
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(d.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filtered.length === 0 && (
+                {rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No documents found.
@@ -200,6 +230,8 @@ const DocumentsPage = () => {
                 )}
               </TableBody>
             </Table>
+            <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -240,6 +272,25 @@ const DocumentsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteDoc.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create / Upload Dialog */}
       <Dialog open={createOpen} onOpenChange={handleCloseCreate}>
