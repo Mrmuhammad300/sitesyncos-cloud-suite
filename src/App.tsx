@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ModulePage from "@/pages/ModulePage";
 
 // Lazy-loaded pages
@@ -19,11 +20,13 @@ const RFIsPage = lazy(() => import("@/pages/build/RFIsPage"));
 const SubmittalsPage = lazy(() => import("@/pages/build/SubmittalsPage"));
 const ChangeOrdersPage = lazy(() => import("@/pages/build/ChangeOrdersPage"));
 const DailyReportsPage = lazy(() => import("@/pages/build/DailyReportsPage"));
+const PunchListPage = lazy(() => import("@/pages/build/PunchListPage"));
 const PropertiesPage = lazy(() => import("@/pages/vault/PropertiesPage"));
 const ROICalculatorPage = lazy(() => import("@/pages/vault/ROICalculatorPage"));
 const LenderPortalPage = lazy(() => import("@/pages/vault/LenderPortalPage"));
 const TreasuryPage = lazy(() => import("@/pages/treasury/TreasuryPage"));
 const BudgetsPage = lazy(() => import("@/pages/ops/BudgetsPage"));
+const CostDashboardPage = lazy(() => import("@/pages/ops/CostDashboardPage"));
 const DrawRequestsPage = lazy(() => import("@/pages/ops/DrawRequestsPage"));
 const TenantsPage = lazy(() => import("@/pages/ops/TenantsPage"));
 const WorkOrdersPage = lazy(() => import("@/pages/ops/WorkOrdersPage"));
@@ -34,12 +37,25 @@ const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
 const AIAssistantPage = lazy(() => import("@/pages/ai/AIAssistantPage"));
 const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
 const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
+const GeneratorPage = lazy(() => import("@/pages/spatial/GeneratorPage"));
+const ClashAnalysisPage = lazy(() => import("@/pages/spatial/ClashAnalysisPage"));
+const DesignAssistantPage = lazy(() => import("@/pages/spatial/DesignAssistantPage"));
 const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
 const SettingsPage = lazy(() => import("@/pages/system/SettingsPage"));
+const TeamPage = lazy(() => import("@/pages/system/TeamPage"));
+const AuditLogPage = lazy(() => import("@/pages/system/AuditLogPage"));
 const CompliancePage = lazy(() => import("@/pages/vault/CompliancePage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,   // data stays fresh for 5 minutes
+      gcTime:    10 * 60 * 1000,  // inactive cache lives for 10 minutes
+      retry: 1,
+    },
+  },
+});
 
 const Loading = () => (
   <div className="flex items-center justify-center h-full min-h-[200px]">
@@ -63,6 +79,7 @@ const App = () => (
               <Route path="*" element={
                 <ProtectedRoute>
                   <AppLayout>
+                    <ErrorBoundary>
                     <Suspense fallback={<Loading />}>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
@@ -77,7 +94,9 @@ const App = () => (
                         <Route path="/build/change-orders" element={<ChangeOrdersPage />} />
                         <Route path="/build/daily-reports" element={<DailyReportsPage />} />
                         <Route path="/build/schedule" element={<SchedulePage />} />
+                        <Route path="/build/punch-list" element={<PunchListPage />} />
                         {/* Ops */}
+                        <Route path="/ops/cost-dashboard" element={<CostDashboardPage />} />
                         <Route path="/ops/budgets" element={<BudgetsPage />} />
                         <Route path="/ops/draws" element={<DrawRequestsPage />} />
                         <Route path="/ops/tenants" element={<TenantsPage />} />
@@ -95,9 +114,14 @@ const App = () => (
                         {/* Spatial */}
                         <Route path="/spatial/viewer" element={<ViewerPage />} />
                         <Route path="/spatial/plans" element={<FloorPlansPage />} />
+                        <Route path="/spatial/generator" element={<GeneratorPage />} />
+                        <Route path="/spatial/clash" element={<ClashAnalysisPage />} />
+                        <Route path="/spatial/design-assistant" element={<DesignAssistantPage />} />
                         {/* System */}
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/team" element={<TeamPage />} />
+                        <Route path="/audit-log" element={<AuditLogPage />} />
                         {/* Vault extras */}
                         <Route path="/vault/compliance" element={<CompliancePage />} />
                         {/* Stubs (none remaining) */}
@@ -107,6 +131,7 @@ const App = () => (
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
+                    </ErrorBoundary>
                   </AppLayout>
                 </ProtectedRoute>
               } />

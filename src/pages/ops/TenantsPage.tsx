@@ -5,11 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Users, DollarSign, Home, AlertTriangle } from "lucide-react";
-import { useTenants, useCreateTenant } from "@/hooks/useOpsData";
+import { Search, Plus, Users, DollarSign, Home, AlertTriangle, Trash2, Download } from "lucide-react";
+import { useTenants, useCreateTenant, useDeleteTenant } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { exportToCSV } from "@/lib/export";
+
+type Tenant = Tables<"tenants">;
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success",
@@ -22,15 +29,22 @@ const TenantsPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [createOpen, setCreateOpen] = useState(false);
-  const [detail, setDetail] = useState<Tables<"tenants"> | null>(null);
+  const [detail, setDetail] = useState<Tenant | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ tenant_name: "", property_name: "", unit: "", monthly_rent: "", lease_start: "", lease_end: "", contact_email: "", contact_phone: "", notes: "" });
   const filters = ["All", "Active", "Pending", "Expired", "Terminated"];
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
+  const deleteTenant = useDeleteTenant();
 
   const filtered = tenants.filter(
     (t) => (filter === "All" || t.status === filter) && (t.tenant_name.toLowerCase().includes(search.toLowerCase()) || t.property_name.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+  } = useTableFeatures<Tenant>(filtered, { pageSize: 25 });
 
   const totalRent = tenants.filter(t => t.status === "Active").reduce((s, t) => s + Number(t.monthly_rent), 0);
   const expiringSoon = tenants.filter(t => {
@@ -63,11 +77,23 @@ const TenantsPage = () => {
     setForm({ tenant_name: "", property_name: "", unit: "", monthly_rent: "", lease_start: "", lease_end: "", contact_email: "", contact_phone: "", notes: "" });
   };
 
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "tenants", {
+      tenant_name: "Tenant", property_name: "Property", unit: "Unit",
+      status: "Status", monthly_rent: "Monthly Rent",
+      lease_start: "Lease Start", lease_end: "Lease End",
+      contact_email: "Email", contact_phone: "Phone",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Tenants</h1><p className="text-sm text-muted-foreground">Manage tenant leases and contacts</p></div>
-        <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Tenant</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Tenant</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -79,24 +105,70 @@ const TenantsPage = () => {
         <div className="flex gap-2 flex-wrap">{filters.map((f) => (<Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>{f}</Button>))}</div>
       </div>
 
-      <Card><CardContent className="p-0">
+      {/* Mobile cards */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No tenants found.</p>
+        ) : rows.map((t) => (
+          <Card key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{t.tenant_name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.property_name}{t.unit ? ` · Unit ${t.unit}` : ""}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteId(t.id); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge className={`text-[10px] ${statusColor[t.status]}`}>{t.status}</Badge>
+                <span className="text-xs font-mono text-muted-foreground">${Number(t.monthly_rent).toLocaleString()}/mo</span>
+                {t.lease_end && <span className="text-xs text-muted-foreground">Ends {t.lease_end}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="hidden sm:block"><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>Tenant</TableHead><TableHead>Property</TableHead><TableHead>Unit</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Rent</TableHead><TableHead>Lease End</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filtered.map((t) => (
-                <TableRow key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
-                  <TableCell className="font-medium">{t.tenant_name}</TableCell>
-                  <TableCell>{t.property_name}</TableCell>
-                  <TableCell>{t.unit || "—"}</TableCell>
-                  <TableCell><Badge className={statusColor[t.status]}>{t.status}</Badge></TableCell>
-                  <TableCell className="text-right font-mono">${Number(t.monthly_rent).toLocaleString()}/mo</TableCell>
-                  <TableCell className="text-sm">{t.lease_end || "—"}</TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHeader label="Tenant" sortKey="tenant_name" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Tenant)} />
+                  <SortableHeader label="Property" sortKey="property_name" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Tenant)} />
+                  <TableHead>Unit</TableHead>
+                  <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Tenant)} />
+                  <SortableHeader label="Rent" sortKey="monthly_rent" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Tenant)} className="text-right" />
+                  <SortableHeader label="Lease End" sortKey="lease_end" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Tenant)} />
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No tenants found</TableCell></TableRow>}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((t) => (
+                  <TableRow key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
+                    <TableCell className="font-medium">{t.tenant_name}</TableCell>
+                    <TableCell>{t.property_name}</TableCell>
+                    <TableCell>{t.unit || "—"}</TableCell>
+                    <TableCell><Badge className={statusColor[t.status]}>{t.status}</Badge></TableCell>
+                    <TableCell className="text-right font-mono">${Number(t.monthly_rent).toLocaleString()}/mo</TableCell>
+                    <TableCell className="text-sm">{t.lease_end || "—"}</TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(t.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No tenants found</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+            <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+          </>
         )}
       </CardContent></Card>
 
@@ -146,6 +218,24 @@ const TenantsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tenant?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteTenant.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

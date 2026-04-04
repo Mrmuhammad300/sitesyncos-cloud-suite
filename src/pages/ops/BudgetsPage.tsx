@@ -5,13 +5,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart, Sparkles } from "lucide-react";
-import { useBudgets, useCreateBudget } from "@/hooks/useOpsData";
+import { Search, Plus, DollarSign, TrendingUp, AlertTriangle, PieChart, Sparkles, Trash2, Download } from "lucide-react";
+import { useBudgets, useCreateBudget, useDeleteBudget } from "@/hooks/useOpsData";
 import { useAuth } from "@/hooks/useAuth";
 import { Tables } from "@/integrations/supabase/types";
 import { AiInsightCard } from "@/components/AiInsightCard";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { exportToCSV } from "@/lib/export";
+
+type Budget = Tables<"budgets">;
 
 const statusColor: Record<string, string> = {
   Active: "bg-success/10 text-success",
@@ -24,16 +31,23 @@ const BudgetsPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [createOpen, setCreateOpen] = useState(false);
-  const [detail, setDetail] = useState<Tables<"budgets"> | null>(null);
+  const [detail, setDetail] = useState<Budget | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ category: "", description: "", allocated: "", fiscal_year: "" });
   const filters = ["All", "Active", "Draft", "Closed", "Over Budget"];
   const { data: budgets = [], isLoading } = useBudgets();
   const createBudget = useCreateBudget();
+  const deleteBudget = useDeleteBudget();
   const { user } = useAuth();
 
   const filtered = budgets.filter(
     (b) => (filter === "All" || b.status === filter) && b.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+  } = useTableFeatures<Budget>(filtered, { pageSize: 25 });
 
   const totalAllocated = budgets.reduce((s, b) => s + Number(b.allocated), 0);
   const totalSpent = budgets.reduce((s, b) => s + Number(b.spent), 0);
@@ -59,11 +73,21 @@ const BudgetsPage = () => {
     setForm({ category: "", description: "", allocated: "", fiscal_year: "" });
   };
 
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "budgets", {
+      category: "Category", status: "Status", allocated: "Allocated",
+      spent: "Spent", fiscal_year: "Fiscal Year",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Budgets</h1><p className="text-sm text-muted-foreground">Create and manage project budgets</p></div>
-        <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Budget</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Budget</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -84,25 +108,43 @@ const BudgetsPage = () => {
 
       <Card><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Allocated</TableHead><TableHead className="text-right">Spent</TableHead><TableHead>Utilization</TableHead><TableHead>Fiscal Year</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filtered.map((b) => {
-                const pct = Number(b.allocated) > 0 ? Math.round((Number(b.spent) / Number(b.allocated)) * 100) : 0;
-                return (
-                  <TableRow key={b.id} className="cursor-pointer" onClick={() => setDetail(b)}>
-                    <TableCell><div className="font-medium">{b.category}</div><div className="text-xs text-muted-foreground truncate max-w-[200px]">{b.description}</div></TableCell>
-                    <TableCell><Badge className={statusColor[b.status] || "bg-muted text-muted-foreground"}>{b.status}</Badge></TableCell>
-                    <TableCell className="text-right font-mono">${Number(b.allocated).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono">${Number(b.spent).toLocaleString()}</TableCell>
-                    <TableCell><div className="flex items-center gap-2"><Progress value={pct} className="h-2 w-16" /><span className="text-xs">{pct}%</span></div></TableCell>
-                    <TableCell>{b.fiscal_year || "—"}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No budgets found</TableCell></TableRow>}
-            </TableBody>
-          </Table>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHeader label="Category" sortKey="category" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Budget)} />
+                  <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Budget)} />
+                  <SortableHeader label="Allocated" sortKey="allocated" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Budget)} className="text-right" />
+                  <SortableHeader label="Spent" sortKey="spent" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Budget)} className="text-right" />
+                  <TableHead>Utilization</TableHead>
+                  <SortableHeader label="Fiscal Year" sortKey="fiscal_year" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Budget)} />
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((b) => {
+                  const pct = Number(b.allocated) > 0 ? Math.round((Number(b.spent) / Number(b.allocated)) * 100) : 0;
+                  return (
+                    <TableRow key={b.id} className="cursor-pointer" onClick={() => setDetail(b)}>
+                      <TableCell><div className="font-medium">{b.category}</div><div className="text-xs text-muted-foreground truncate max-w-[200px]">{b.description}</div></TableCell>
+                      <TableCell><Badge className={statusColor[b.status] || "bg-muted text-muted-foreground"}>{b.status}</Badge></TableCell>
+                      <TableCell className="text-right font-mono">${Number(b.allocated).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono">${Number(b.spent).toLocaleString()}</TableCell>
+                      <TableCell><div className="flex items-center gap-2"><Progress value={pct} className="h-2 w-16" /><span className="text-xs">{pct}%</span></div></TableCell>
+                      <TableCell>{b.fiscal_year || "—"}</TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(b.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No budgets found</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+            <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+          </>
         )}
       </CardContent></Card>
 
@@ -139,6 +181,24 @@ const BudgetsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Budget?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteBudget.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

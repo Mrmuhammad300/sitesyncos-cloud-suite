@@ -5,11 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, CreditCard, Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react";
-import { useDrawRequests, useCreateDrawRequest } from "@/hooks/useOpsData";
+import { Search, Plus, CreditCard, Clock, CheckCircle2, DollarSign, Trash2, Download, Printer } from "lucide-react";
+import { useDrawRequests, useCreateDrawRequest, useDeleteDrawRequest } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { exportToCSV, printToPDF } from "@/lib/export";
+
+type DrawRequest = Tables<"draw_requests">;
 
 const statusConfig: Record<string, string> = {
   Draft: "bg-muted text-muted-foreground",
@@ -24,15 +31,22 @@ const DrawRequestsPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [createOpen, setCreateOpen] = useState(false);
-  const [detail, setDetail] = useState<Tables<"draw_requests"> | null>(null);
+  const [detail, setDetail] = useState<DrawRequest | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", amount: "", description: "", requested_by: "" });
   const filters = ["All", "Draft", "Submitted", "Under Review", "Approved", "Rejected", "Paid"];
   const { data: draws = [], isLoading } = useDrawRequests();
   const createDraw = useCreateDrawRequest();
+  const deleteDraw = useDeleteDrawRequest();
 
   const filtered = draws.filter(
     (d) => (filter === "All" || d.status === filter) && (d.title.toLowerCase().includes(search.toLowerCase()) || d.draw_number.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+  } = useTableFeatures<DrawRequest>(filtered, { pageSize: 25 });
 
   const totalRequested = draws.reduce((s, d) => s + Number(d.amount), 0);
   const totalApproved = draws.filter(d => d.status === "Approved" || d.status === "Paid").reduce((s, d) => s + Number(d.amount), 0);
@@ -60,11 +74,37 @@ const DrawRequestsPage = () => {
     setForm({ title: "", amount: "", description: "", requested_by: "" });
   };
 
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "draw-requests", {
+      draw_number: "Draw #", title: "Title", status: "Status",
+      amount: "Amount", requested_by: "Requested By", submitted_date: "Submitted",
+    });
+  };
+
+  const handlePrintPDF = () => {
+    const tableHtml = `<table>
+      <thead><tr><th>Draw #</th><th>Title</th><th>Status</th><th>Amount</th><th>Requested By</th><th>Submitted</th></tr></thead>
+      <tbody>${filtered.map(d => `<tr>
+        <td>${d.draw_number}</td>
+        <td>${d.title}</td>
+        <td>${d.status}</td>
+        <td>$${Number(d.amount).toLocaleString()}</td>
+        <td>${d.requested_by ?? "—"}</td>
+        <td>${d.submitted_date ?? "—"}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+    printToPDF(`Draw Requests — ${new Date().toLocaleDateString()}`, tableHtml);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Draw Requests</h1><p className="text-sm text-muted-foreground">Submit and approve draw requests</p></div>
-        <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Draw Request</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" onClick={handlePrintPDF}><Printer className="mr-2 h-4 w-4" />PDF</Button>
+          <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Draw Request</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -78,22 +118,40 @@ const DrawRequestsPage = () => {
 
       <Card><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>Draw #</TableHead><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Requested By</TableHead><TableHead>Submitted</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filtered.map((d) => (
-                <TableRow key={d.id} className="cursor-pointer" onClick={() => setDetail(d)}>
-                  <TableCell className="font-mono text-xs">{d.draw_number}</TableCell>
-                  <TableCell className="font-medium max-w-[250px] truncate">{d.title}</TableCell>
-                  <TableCell><Badge className={statusConfig[d.status]}>{d.status}</Badge></TableCell>
-                  <TableCell className="text-right font-mono">${Number(d.amount).toLocaleString()}</TableCell>
-                  <TableCell>{d.requested_by || "—"}</TableCell>
-                  <TableCell className="text-sm">{d.submitted_date || "—"}</TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHeader label="Draw #" sortKey="draw_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} />
+                  <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} />
+                  <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} />
+                  <SortableHeader label="Amount" sortKey="amount" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} className="text-right" />
+                  <SortableHeader label="Requested By" sortKey="requested_by" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} />
+                  <SortableHeader label="Submitted" sortKey="submitted_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DrawRequest)} />
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No draw requests found</TableCell></TableRow>}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((d) => (
+                  <TableRow key={d.id} className="cursor-pointer" onClick={() => setDetail(d)}>
+                    <TableCell className="font-mono text-xs">{d.draw_number}</TableCell>
+                    <TableCell className="font-medium max-w-[250px] truncate">{d.title}</TableCell>
+                    <TableCell><Badge className={statusConfig[d.status]}>{d.status}</Badge></TableCell>
+                    <TableCell className="text-right font-mono">${Number(d.amount).toLocaleString()}</TableCell>
+                    <TableCell>{d.requested_by || "—"}</TableCell>
+                    <TableCell className="text-sm">{d.submitted_date || "—"}</TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(d.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No draw requests found</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+            <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+          </>
         )}
       </CardContent></Card>
 
@@ -130,6 +188,24 @@ const DrawRequestsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Draw Request?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteDraw.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

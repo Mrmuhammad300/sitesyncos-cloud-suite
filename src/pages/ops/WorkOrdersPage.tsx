@@ -5,12 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wrench, Clock, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
-import { useWorkOrders, useCreateWorkOrder } from "@/hooks/useOpsData";
+import { Search, Plus, Wrench, Clock, CheckCircle2, AlertTriangle, Trash2, Download } from "lucide-react";
+import { useWorkOrders, useCreateWorkOrder, useDeleteWorkOrder } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
+import { useTableFeatures } from "@/hooks/useTableFeatures";
+import { SortableHeader } from "@/components/SortableHeader";
+import { TablePagination } from "@/components/TablePagination";
+import { exportToCSV } from "@/lib/export";
+
+type WorkOrder = Tables<"work_orders">;
 
 const statusConfig: Record<string, string> = {
   Open: "bg-primary/10 text-primary",
@@ -31,15 +38,22 @@ const WorkOrdersPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [createOpen, setCreateOpen] = useState(false);
-  const [detail, setDetail] = useState<Tables<"work_orders"> | null>(null);
+  const [detail, setDetail] = useState<WorkOrder | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", property_name: "", unit: "", due_date: "" });
   const filters = ["All", "Open", "In Progress", "Completed", "On Hold", "Cancelled"];
   const { data: wos = [], isLoading } = useWorkOrders();
   const createWO = useCreateWorkOrder();
+  const deleteWO = useDeleteWorkOrder();
 
   const filtered = wos.filter(
     (w) => (filter === "All" || w.status === filter) && (w.title.toLowerCase().includes(search.toLowerCase()) || w.wo_number.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const {
+    rows, sortKey, sortDir, toggleSort,
+    page, setPage, totalPages, total, pageSize,
+  } = useTableFeatures<WorkOrder>(filtered, { pageSize: 25 });
 
   const kpis = [
     { label: "Total WOs", value: wos.length, icon: <Wrench className="h-5 w-5 text-primary" /> },
@@ -66,11 +80,22 @@ const WorkOrdersPage = () => {
     setForm({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", property_name: "", unit: "", due_date: "" });
   };
 
+  const handleExportCSV = () => {
+    exportToCSV(filtered, "work-orders", {
+      wo_number: "WO #", title: "Title", status: "Status", priority: "Priority",
+      category: "Category", assigned_to: "Assigned To",
+      property_name: "Property", due_date: "Due Date",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Work Orders</h1><p className="text-sm text-muted-foreground">Create and track maintenance work orders</p></div>
-        <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Work Order</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Work Order</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -82,25 +107,73 @@ const WorkOrdersPage = () => {
         <div className="flex gap-2 flex-wrap">{filters.map((f) => (<Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>{f}</Button>))}</div>
       </div>
 
-      <Card><CardContent className="p-0">
+      {/* Mobile cards */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No work orders found.</p>
+        ) : rows.map((w) => (
+          <Card key={w.id} className="cursor-pointer" onClick={() => setDetail(w)}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{w.title}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{w.wo_number}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteId(w.id); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge className={`text-[10px] ${statusConfig[w.status]}`}>{w.status}</Badge>
+                <Badge className={`text-[10px] ${priorityColor[w.priority]}`}>{w.priority}</Badge>
+                {w.category && <span className="text-xs text-muted-foreground">{w.category}</span>}
+                {w.assigned_to && <span className="text-xs text-muted-foreground">{w.assigned_to}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="hidden sm:block"><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>WO #</TableHead><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead>Priority</TableHead><TableHead>Category</TableHead><TableHead>Assigned To</TableHead><TableHead>Due Date</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filtered.map((w) => (
-                <TableRow key={w.id} className="cursor-pointer" onClick={() => setDetail(w)}>
-                  <TableCell className="font-mono text-xs">{w.wo_number}</TableCell>
-                  <TableCell className="font-medium max-w-[250px] truncate">{w.title}</TableCell>
-                  <TableCell><Badge className={statusConfig[w.status]}>{w.status}</Badge></TableCell>
-                  <TableCell><Badge className={priorityColor[w.priority]}>{w.priority}</Badge></TableCell>
-                  <TableCell>{w.category || "—"}</TableCell>
-                  <TableCell>{w.assigned_to || "—"}</TableCell>
-                  <TableCell className="text-sm">{w.due_date || "—"}</TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHeader label="WO #" sortKey="wo_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <SortableHeader label="Priority" sortKey="priority" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <TableHead>Category</TableHead>
+                  <SortableHeader label="Assigned To" sortKey="assigned_to" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <SortableHeader label="Due Date" sortKey="due_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No work orders found</TableCell></TableRow>}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((w) => (
+                  <TableRow key={w.id} className="cursor-pointer" onClick={() => setDetail(w)}>
+                    <TableCell className="font-mono text-xs">{w.wo_number}</TableCell>
+                    <TableCell className="font-medium max-w-[250px] truncate">{w.title}</TableCell>
+                    <TableCell><Badge className={statusConfig[w.status]}>{w.status}</Badge></TableCell>
+                    <TableCell><Badge className={priorityColor[w.priority]}>{w.priority}</Badge></TableCell>
+                    <TableCell>{w.category || "—"}</TableCell>
+                    <TableCell>{w.assigned_to || "—"}</TableCell>
+                    <TableCell className="text-sm">{w.due_date || "—"}</TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(w.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No work orders found</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+            <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
+          </>
         )}
       </CardContent></Card>
 
@@ -157,6 +230,24 @@ const WorkOrdersPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) { deleteWO.mutate(deleteId); setDeleteId(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import {
-  Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat, 
+  Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat,
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
-  LayoutDashboard, Settings, Bell
+  LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText,
+  Wand2, AlertTriangle, MessageSquare
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -39,11 +40,13 @@ const moduleGroups = [
       { title: "Change Orders", url: "/build/change-orders", icon: Layers },
       { title: "Daily Reports", url: "/build/daily-reports", icon: Activity },
       { title: "Schedule", url: "/build/schedule", icon: BarChart3 },
+      { title: "Punch List", url: "/build/punch-list", icon: CheckSquare },
     ],
   },
   {
     label: "SiteSync Ops",
     items: [
+      { title: "Cost Dashboard", url: "/ops/cost-dashboard", icon: TrendingUp },
       { title: "Budgets", url: "/ops/budgets", icon: DollarSign },
       { title: "Draw Requests", url: "/ops/draws", icon: CreditCard },
       { title: "Tenants", url: "/ops/tenants", icon: Users },
@@ -72,6 +75,16 @@ const moduleGroups = [
     items: [
       { title: "3D Viewer", url: "/spatial/viewer", icon: Box },
       { title: "Floor Plans", url: "/spatial/plans", icon: Home },
+      { title: "3D Generator", url: "/spatial/generator", icon: Wand2 },
+      { title: "Clash Analysis", url: "/spatial/clash", icon: AlertTriangle },
+      { title: "Design Assistant", url: "/spatial/design-assistant", icon: MessageSquare },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { title: "Team", url: "/team", icon: UserCog },
+      { title: "Audit Log", url: "/audit-log", icon: ScrollText },
     ],
   },
 ];
