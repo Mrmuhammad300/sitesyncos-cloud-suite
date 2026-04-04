@@ -335,14 +335,11 @@ export default function DailyReportsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Action Bar */}
       <BulkActionBar
         count={selectedCount}
         onClear={clearSelection}
         actions={[
-          { label: "Draft", onClick: () => handleBulkStatusUpdate("Draft") },
-          { label: "Submitted", onClick: () => handleBulkStatusUpdate("Submitted") },
-          { label: "Approved", onClick: () => handleBulkStatusUpdate("Approved") },
+          { label: "Delete Selected", onClick: () => handleBulkDelete() },
         ]}
       />
     </div>
