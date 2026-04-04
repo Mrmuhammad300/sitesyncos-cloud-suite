@@ -14,7 +14,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useRef as useThreeRef } from "react";
 
-// ─── Mock clash data (replaced with real data from Blender MCP result) ──────
+// ─── Clash record shape (matches Blender MCP result_metadata.clashes) ────────
 
 interface ClashRecord {
   id: string;
@@ -27,13 +27,27 @@ interface ClashRecord {
   description: string;
 }
 
-const DEMO_CLASHES: ClashRecord[] = [
-  { id: "c1", elementA: "HVAC Duct-142", elementB: "Beam-B3-22", disciplineA: "MEP", disciplineB: "Structural", severity: "Critical", location: "Level 3, Grid B-C/2-3", description: "HVAC main duct intersects structural beam by 120mm" },
-  { id: "c2", elementA: "Sprinkler-Header-7", elementB: "Column-C4", disciplineA: "MEP", disciplineB: "Structural", severity: "Critical", location: "Level 2, Grid C/4", description: "Fire sprinkler header runs through concrete column" },
-  { id: "c3", elementA: "Conduit-E-48", elementB: "Slab-L4", disciplineA: "MEP", disciplineB: "Structural", severity: "Major", location: "Level 4, Grid A/1", description: "Electrical conduit embeds in slab without sleeve" },
-  { id: "c4", elementA: "Plumbing-P-33", elementB: "HVAC-Return-12", disciplineA: "MEP", disciplineB: "MEP", severity: "Major", location: "Level 1, Ceiling Plenum", description: "Domestic water pipe and return air duct overlap" },
-  { id: "c5", elementA: "CW-Pipe-22", elementB: "Footing-F-9", disciplineA: "MEP", disciplineB: "Structural", severity: "Minor", location: "Basement, Grid D/5", description: "Chilled water pipe passes within 50mm of spread footing" },
-];
+/** Parse clashes from a completed blender_job result_metadata. */
+function parseClashes(resultMetadata: unknown): ClashRecord[] {
+  if (!resultMetadata || typeof resultMetadata !== "object") return [];
+  const meta = resultMetadata as Record<string, unknown>;
+  const blenderResponse = meta["blender_response"] ?? meta;
+  if (!blenderResponse || typeof blenderResponse !== "object") return [];
+  const clashesRaw = (blenderResponse as Record<string, unknown>)["clashes"];
+  if (!Array.isArray(clashesRaw)) return [];
+  return clashesRaw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+    .map((c, i) => ({
+      id: String(c["id"] ?? `clash-${i}`),
+      elementA: String(c["elementA"] ?? c["element_a"] ?? "Unknown A"),
+      elementB: String(c["elementB"] ?? c["element_b"] ?? "Unknown B"),
+      disciplineA: String(c["disciplineA"] ?? c["discipline_a"] ?? "Unknown"),
+      disciplineB: String(c["disciplineB"] ?? c["discipline_b"] ?? "Unknown"),
+      severity: (["Critical", "Major", "Minor"].includes(String(c["severity"])) ? c["severity"] : "Minor") as ClashRecord["severity"],
+      location: String(c["location"] ?? "—"),
+      description: String(c["description"] ?? "—"),
+    }));
+}
 
 const severityColor: Record<string, string> = {
   Critical: "bg-destructive/10 text-destructive border-destructive/20",
@@ -103,7 +117,6 @@ export default function ClashAnalysisPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [projectId, setProjectId] = useState<string>("none");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [showDemoClashes, setShowDemoClashes] = useState(false);
   const [selectedClashes, setSelectedClashes] = useState<Set<string>>(new Set());
 
   const { data: projects } = useProjects();
@@ -112,7 +125,10 @@ export default function ClashAnalysisPage() {
   const { data: activeJob } = useBlenderJobStatus(activeJobId);
 
   const isAnalyzing = activeJob?.status === "pending" || activeJob?.status === "processing";
-  const clashes = showDemoClashes ? DEMO_CLASHES : [];
+  // Parse real clash results from the completed job's result_metadata
+  const clashes: ClashRecord[] = activeJob?.status === "completed"
+    ? parseClashes(activeJob.result_metadata)
+    : [];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -127,8 +143,6 @@ export default function ClashAnalysisPage() {
       file: selectedFile,
     });
     setActiveJobId(job.id);
-    // Show demo clashes after a brief delay to simulate result
-    setTimeout(() => setShowDemoClashes(true), 3000);
   };
 
   const toggleClashSelect = (id: string) => {
@@ -295,7 +309,7 @@ export default function ClashAnalysisPage() {
               <div className="aspect-[16/9] rounded-lg overflow-hidden bg-muted/20">
                 <Canvas shadows>
                   <Suspense fallback={<Html center><div className="text-xs text-muted-foreground">Loading…</div></Html>}>
-                    <ClashScene hasModel={showDemoClashes} />
+                    <ClashScene hasModel={clashes.length > 0} />
                   </Suspense>
                 </Canvas>
               </div>

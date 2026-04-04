@@ -250,6 +250,47 @@ export type Database = {
           },
         ]
       }
+      webhook_deliveries: {
+        Row: {
+          id: string
+          webhook_id: string
+          event_type: string
+          payload: Json
+          response_status: number | null
+          response_body: string | null
+          attempt: number
+          delivered_at: string
+        }
+        Insert: {
+          id?: string
+          webhook_id: string
+          event_type: string
+          payload?: Json
+          response_status?: number | null
+          response_body?: string | null
+          attempt?: number
+          delivered_at?: string
+        }
+        Update: {
+          id?: string
+          webhook_id?: string
+          event_type?: string
+          payload?: Json
+          response_status?: number | null
+          response_body?: string | null
+          attempt?: number
+          delivered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhooks: {
         Row: {
           id: string

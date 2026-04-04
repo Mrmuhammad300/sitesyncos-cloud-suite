@@ -4,6 +4,7 @@ import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/type
 import { toast } from "sonner";
 
 export type Webhook = Tables<"webhooks">;
+export type WebhookDelivery = Tables<"webhook_deliveries">;
 
 // Known event types for webhook subscriptions
 export const WEBHOOK_EVENTS = [
@@ -46,24 +47,15 @@ export function useWebhookDeliveries(webhookId: string | null) {
   return useQuery({
     queryKey: ["webhook_deliveries", webhookId],
     queryFn: async () => {
-      if (!webhookId) return [];
+      if (!webhookId) return [] as WebhookDelivery[];
       const { data, error } = await supabase
-        .from("webhook_deliveries" as never)
+        .from("webhook_deliveries")
         .select("*")
         .eq("webhook_id", webhookId)
         .order("delivered_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data as Array<{
-        id: string;
-        webhook_id: string;
-        event_type: string;
-        payload: Record<string, unknown>;
-        response_status: number | null;
-        response_body: string | null;
-        attempt: number;
-        delivered_at: string;
-      }>;
+      return data ?? [];
     },
     enabled: !!webhookId,
   });

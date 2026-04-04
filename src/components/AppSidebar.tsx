@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
   LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText,
-  Wand2, AlertTriangle, MessageSquare
+  Wand2, AlertTriangle, MessageSquare, Webhook
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -85,6 +85,8 @@ const moduleGroups = [
     items: [
       { title: "Team", url: "/team", icon: UserCog },
       { title: "Audit Log", url: "/audit-log", icon: ScrollText },
+      { title: "Webhooks", url: "/webhooks", icon: Webhook },
+      { title: "Settings", url: "/settings", icon: Settings },
     ],
   },
 ];

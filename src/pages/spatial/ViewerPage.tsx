@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff, Maximize2 } from "lucide-react";
 import * as THREE from "three";
+import { useGeneratedModels, useBlenderJobs } from "@/hooks/useBlenderData";
 
-const mockModels = [
-  { id: "1", name: "Tower A – Structural", type: "IFC", size: "142 MB", elements: 12480, lastUpdated: "2026-03-28" },
-  { id: "2", name: "Tower B – MEP Systems", type: "RVT", size: "89 MB", elements: 8320, lastUpdated: "2026-03-30" },
-  { id: "3", name: "Podium – Architectural", type: "IFC", size: "204 MB", elements: 18750, lastUpdated: "2026-04-01" },
+// Fallback mock data shown only when no real models exist yet
+const FALLBACK_MODELS = [
+  { id: "mock-1", name: "Tower A – Structural (demo)", type: "IFC", elements: 12480, lastUpdated: "—" },
+  { id: "mock-2", name: "Tower B – MEP Systems (demo)", type: "RVT", elements: 8320, lastUpdated: "—" },
+  { id: "mock-3", name: "Podium – Architectural (demo)", type: "IFC", elements: 18750, lastUpdated: "—" },
 ];
 
 interface LayerState { name: string; visible: boolean; color: string; count: number }
@@ -115,9 +117,35 @@ function Scene({ layers }: { layers: LayerState[] }) {
 }
 
 export default function ViewerPage() {
-  const [selectedModel, setSelectedModel] = useState(mockModels[0].id);
+  const { data: generatedModels = [], isLoading: modelsLoading } = useGeneratedModels();
+  const { data: blenderJobs = [] } = useBlenderJobs();
+
+  // Build a unified model list from real data; fall back to demo when empty
+  const realModels = generatedModels
+    .filter(m => m.file_format === "glb" || m.file_format === "gltf")
+    .map(m => {
+      const job = blenderJobs.find(j => j.id === m.blender_job_id);
+      return {
+        id: m.id,
+        name: m.model_name,
+        type: m.file_format.toUpperCase(),
+        elements: m.element_count ?? 0,
+        lastUpdated: new Date(m.created_at).toLocaleDateString(),
+        fileUrl: m.file_url,
+        jobType: job?.job_type ?? "generate",
+        isReal: true,
+      };
+    });
+
+  const models = realModels.length > 0
+    ? realModels
+    : FALLBACK_MODELS.map(m => ({ ...m, fileUrl: null, jobType: "demo", isReal: false }));
+
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [layers, setLayers] = useState(initialLayers);
-  const model = mockModels.find(m => m.id === selectedModel) ?? mockModels[0];
+
+  const selectedId = selectedModelId ?? models[0]?.id ?? "";
+  const model = models.find(m => m.id === selectedId) ?? models[0];
 
   const toggleLayer = (i: number) => setLayers(prev => prev.map((l, idx) => idx === i ? { ...l, visible: !l.visible } : l));
 
@@ -128,12 +156,19 @@ export default function ViewerPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">3D Viewer</h1>
             <Badge variant="outline" className="text-[10px]">Spatial Workbench</Badge>
+            {realModels.length === 0 && !modelsLoading && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/40">Demo Mode</Badge>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Interactive BIM model visualization.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {modelsLoading ? "Loading models…" : realModels.length > 0
+              ? `${realModels.length} generated model${realModels.length !== 1 ? "s" : ""} from Blender.`
+              : "Interactive BIM model visualization. Generate models via Spatial → 3D Generator."}
+          </p>
         </div>
-        <Select value={selectedModel} onValueChange={setSelectedModel}>
+        <Select value={selectedId} onValueChange={setSelectedModelId}>
           <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
-          <SelectContent>{mockModels.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{models.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
 
@@ -154,10 +189,15 @@ export default function ViewerPage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Model Info</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Format</span><span className="font-medium">{model.type}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Size</span><span className="font-medium">{model.size}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Elements</span><span className="font-medium">{model.elements.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Updated</span><span className="font-medium">{model.lastUpdated}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Format</span><span className="font-medium">{model?.type ?? "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Elements</span><span className="font-medium">{(model?.elements ?? 0).toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Updated</span><span className="font-medium">{model?.lastUpdated ?? "—"}</span></div>
+              {"fileUrl" in (model ?? {}) && (model as { fileUrl: string | null }).fileUrl && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Source</span>
+                  <Badge variant="outline" className="text-[10px]">Blender</Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -179,9 +219,9 @@ export default function ViewerPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Elements", value: model.elements.toLocaleString() },
+          { label: "Total Elements", value: (model?.elements ?? 0).toLocaleString() },
           { label: "Visible Layers", value: `${layers.filter(l => l.visible).length} / ${layers.length}` },
-          { label: "Clash Issues", value: "12" },
+          { label: "Generated Models", value: realModels.length.toString() },
           { label: "Annotations", value: "34" },
         ].map(s => (
           <Card key={s.label}><CardContent className="p-4 text-center"><p className="text-lg font-bold">{s.value}</p><p className="text-[11px] text-muted-foreground">{s.label}</p></CardContent></Card>

@@ -43,6 +43,7 @@ const GeneratorPage = lazy(() => import("@/pages/spatial/GeneratorPage"));
 const ClashAnalysisPage = lazy(() => import("@/pages/spatial/ClashAnalysisPage"));
 const DesignAssistantPage = lazy(() => import("@/pages/spatial/DesignAssistantPage"));
 const NotificationsPage = lazy(() => import("@/pages/system/NotificationsPage"));
+const WebhooksPage = lazy(() => import("@/pages/system/WebhooksPage"));
 const SettingsPage = lazy(() => import("@/pages/system/SettingsPage"));
 const TeamPage = lazy(() => import("@/pages/system/TeamPage"));
 const AuditLogPage = lazy(() => import("@/pages/system/AuditLogPage"));
@@ -136,6 +137,7 @@ const App = () => (
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/team" element={<TeamPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
+                        <Route path="/webhooks" element={<WebhooksPage />} />
                         {/* Vault extras */}
                         <Route path="/vault/compliance" element={<CompliancePage />} />
                         {/* Stubs (none remaining) */}
