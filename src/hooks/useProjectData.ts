@@ -260,3 +260,75 @@ export function useDeleteDailyReport() {
 
 // Re-export Tables type for convenience
 export type { Tables };
+
+// ─── Submittal Files ──────────────────────────────────────────────────────────
+// Note: submittal_files is not yet in generated types.ts — uses `as never` cast
+// until `supabase gen types` is re-run after applying submittal_files.sql
+
+export interface SubmittalFile {
+  id: string;
+  submittal_id: string;
+  file_name: string;
+  file_url: string;
+  file_size: string | null;
+  version: number;
+  uploaded_by: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export function useSubmittalFiles(submittalId: string | null) {
+  return useQuery({
+    queryKey: ["submittal_files", submittalId],
+    queryFn: async () => {
+      if (!submittalId) return [] as SubmittalFile[];
+      const { data, error } = await (supabase as never as { from: (t: string) => { select: (s: string) => { eq: (col: string, val: string) => { order: (col: string, opts: object) => Promise<{ data: SubmittalFile[] | null; error: Error | null }> } } } })
+        .from("submittal_files")
+        .select("*")
+        .eq("submittal_id", submittalId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!submittalId,
+  });
+}
+
+export function useCreateSubmittalFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { submittal_id: string; file_name: string; file_url: string; file_size: string | null; version: number; uploaded_by: string | null; notes: string | null }) => {
+      const { data, error } = await (supabase as never as { from: (t: string) => { insert: (p: object) => { select: () => { single: () => Promise<{ data: SubmittalFile | null; error: Error | null }> } } } })
+        .from("submittal_files")
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["submittal_files", vars.submittal_id] });
+      toast.success("File attached");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteSubmittalFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, submittalId }: { id: string; submittalId: string }) => {
+      const { error } = await (supabase as never as { from: (t: string) => { delete: () => { eq: (col: string, val: string) => Promise<{ error: Error | null }> } } })
+        .from("submittal_files")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      return submittalId;
+    },
+    onSuccess: (submittalId) => {
+      qc.invalidateQueries({ queryKey: ["submittal_files", submittalId] });
+      toast.success("File removed");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}

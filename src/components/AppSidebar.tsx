@@ -45,6 +45,7 @@ const moduleGroups = [
   {
     label: "SiteSync Ops",
     items: [
+      { title: "Cost Dashboard", url: "/ops/cost-dashboard", icon: TrendingUp },
       { title: "Budgets", url: "/ops/budgets", icon: DollarSign },
       { title: "Draw Requests", url: "/ops/draws", icon: CreditCard },
       { title: "Tenants", url: "/ops/tenants", icon: Users },

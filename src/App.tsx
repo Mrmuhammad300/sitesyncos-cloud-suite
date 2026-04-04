@@ -26,6 +26,7 @@ const ROICalculatorPage = lazy(() => import("@/pages/vault/ROICalculatorPage"));
 const LenderPortalPage = lazy(() => import("@/pages/vault/LenderPortalPage"));
 const TreasuryPage = lazy(() => import("@/pages/treasury/TreasuryPage"));
 const BudgetsPage = lazy(() => import("@/pages/ops/BudgetsPage"));
+const CostDashboardPage = lazy(() => import("@/pages/ops/CostDashboardPage"));
 const DrawRequestsPage = lazy(() => import("@/pages/ops/DrawRequestsPage"));
 const TenantsPage = lazy(() => import("@/pages/ops/TenantsPage"));
 const WorkOrdersPage = lazy(() => import("@/pages/ops/WorkOrdersPage"));
@@ -92,6 +93,7 @@ const App = () => (
                         <Route path="/build/schedule" element={<SchedulePage />} />
                         <Route path="/build/punch-list" element={<PunchListPage />} />
                         {/* Ops */}
+                        <Route path="/ops/cost-dashboard" element={<CostDashboardPage />} />
                         <Route path="/ops/budgets" element={<BudgetsPage />} />
                         <Route path="/ops/draws" element={<DrawRequestsPage />} />
                         <Route path="/ops/tenants" element={<TenantsPage />} />

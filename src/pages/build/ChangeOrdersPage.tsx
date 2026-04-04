@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, ArrowUpRight, Trash2, Download, Printer } from "lucide-react";
-import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder, useDeleteChangeOrder } from "@/hooks/useProjectData";
+import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder, useDeleteChangeOrder, useProjects } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
@@ -34,12 +34,14 @@ const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : `$${v.toLoca
 
 export default function ChangeOrdersPage() {
   const { data: changeOrders = [], isLoading } = useChangeOrders();
+  const { data: projects = [] } = useProjects();
   const createCO = useCreateChangeOrder();
   const updateCO = useUpdateChangeOrder();
   const deleteCO = useDeleteChangeOrder();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -51,7 +53,8 @@ export default function ChangeOrdersPage() {
     const ms = co.title.toLowerCase().includes(search.toLowerCase()) ||
       co.co_number.toLowerCase().includes(search.toLowerCase());
     const mst = statusFilter === "all" || co.status === statusFilter;
-    return ms && mst;
+    const mp = projectFilter === "all" || co.project_id === projectFilter;
+    return ms && mst && mp;
   });
 
   const {
@@ -145,8 +148,8 @@ export default function ChangeOrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search change orders…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
         </div>
@@ -157,10 +160,48 @@ export default function ChangeOrdersPage() {
             {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+        {projects.length > 0 && (
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="All Projects" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Mobile cards */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No change orders found.</p>
+        ) : rows.map((co) => (
+          <Card key={co.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{co.title}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{co.co_number}{co.category ? ` · ${co.category}` : ""}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(co.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge variant="outline" className={`text-[10px] ${statusColor[co.status] ?? ""}`}>{co.status}</Badge>
+                <span className="text-xs font-mono font-medium">{fmt(Number(co.amount))}</span>
+                {Number(co.days_impact) > 0 && <span className="text-xs text-warning">+{co.days_impact}d</span>}
+                {co.requested_by && <span className="text-xs text-muted-foreground">{co.requested_by}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Table — hidden on mobile */}
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>

@@ -180,8 +180,37 @@ export default function DailyReportsPage() {
         </Select>
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Mobile cards */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No reports found.</p>
+        ) : rows.map((r) => (
+          <Card key={r.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{r.report_date}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{r.report_number}{r.author_name ? ` · ${r.author_name}` : ""}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(r.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
+                <span className="text-xs text-muted-foreground">{r.crew_count} crew · {r.work_hours}h</span>
+                {r.weather && <span className="text-xs text-muted-foreground">{r.weather}</span>}
+                {r.safety_incidents > 0 && <span className="text-xs text-destructive font-medium">{r.safety_incidents} incident{r.safety_incidents > 1 ? "s" : ""}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Table — hidden on mobile */}
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
