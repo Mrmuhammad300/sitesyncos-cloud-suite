@@ -113,8 +113,8 @@ export function GlobalSearch() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tenants")
-        .select("id, name, unit_number")
-        .ilike("name", q)
+        .select("id, tenant_name, unit")
+        .ilike("tenant_name", q)
         .limit(5);
       return (data ?? []).map<SearchResult>((r) => ({
         id: r.id,
