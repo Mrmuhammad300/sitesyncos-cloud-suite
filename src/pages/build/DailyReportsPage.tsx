@@ -257,19 +257,6 @@ export default function DailyReportsPage() {
                           : <span className="text-success">0</span>}
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={r.status}
-                          onValueChange={v => updateReport.mutate({ id: r.id, status: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[110px] text-[10px] border-0 p-0">
-                            <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
                         <Button
                           variant="ghost"
                           size="icon"
