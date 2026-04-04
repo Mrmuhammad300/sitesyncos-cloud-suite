@@ -6,44 +6,32 @@
 
 @layer base {
   :root {
-    /* Brand */
+    /* Light mode — kept minimal, dark is primary */
     --background: 210 20% 98%;
     --foreground: 222 84% 5%;
-
     --card: 0 0% 100%;
     --card-foreground: 222 84% 5%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 84% 5%;
-
     --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-
-    --accent: 217 91% 60%;
+    --accent: 262 83% 58%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-
     --success: 160 84% 39%;
     --success-foreground: 210 40% 98%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 11%;
-
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 217 91% 60%;
+    --radius: 0.5rem;
 
-    --radius: 0.375rem;
-
-    /* Sidebar — dark navy */
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 213 31% 91%;
     --sidebar-primary: 217 91% 60%;
@@ -54,59 +42,36 @@
     --sidebar-ring: 217 91% 60%;
     --sidebar-muted: 215 20% 65%;
 
-    /* Charts */
     --chart-1: 217 91% 60%;
     --chart-2: 160 84% 39%;
     --chart-3: 38 92% 50%;
     --chart-4: 0 84% 60%;
     --chart-5: 262 83% 58%;
-
-    /* Status badge tokens */
-    --status-active-bg: 217 91% 60%;
-    --status-active-fg: 224 76% 48%;
-    --status-progress-bg: 38 92% 50%;
-    --status-progress-fg: 33 100% 29%;
-    --status-complete-bg: 160 84% 39%;
-    --status-complete-fg: 163 94% 20%;
-    --status-closed-bg: 215 16% 47%;
-    --status-closed-fg: 215 25% 27%;
-    --status-overdue-bg: 0 84% 60%;
-    --status-overdue-fg: 0 63% 31%;
   }
 
   .dark {
-    --background: 222 47% 4%;
+    --background: 222 47% 6%;
     --foreground: 213 31% 91%;
-
-    --card: 222 47% 11%;
+    --card: 222 41% 10%;
     --card-foreground: 213 31% 91%;
-
-    --popover: 222 47% 11%;
+    --popover: 222 41% 10%;
     --popover-foreground: 213 31% 91%;
-
     --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 215 28% 17%;
     --muted-foreground: 215 20% 65%;
-
-    --accent: 217 91% 60%;
+    --accent: 262 83% 58%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
-
     --success: 160 84% 39%;
     --success-foreground: 210 40% 98%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 11%;
-
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
     --ring: 217 91% 60%;
 
     --sidebar-background: 222 47% 4%;
@@ -115,7 +80,7 @@
     --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 215 28% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 28% 17%;
+    --sidebar-border: 217 33% 17%;
     --sidebar-ring: 217 91% 60%;
     --sidebar-muted: 215 20% 65%;
 
@@ -124,17 +89,6 @@
     --chart-3: 38 92% 50%;
     --chart-4: 0 84% 60%;
     --chart-5: 262 83% 58%;
-
-    --status-active-bg: 217 91% 60%;
-    --status-active-fg: 210 40% 98%;
-    --status-progress-bg: 38 92% 50%;
-    --status-progress-fg: 38 100% 80%;
-    --status-complete-bg: 160 84% 39%;
-    --status-complete-fg: 160 84% 85%;
-    --status-closed-bg: 215 16% 47%;
-    --status-closed-fg: 215 20% 75%;
-    --status-overdue-bg: 0 84% 60%;
-    --status-overdue-fg: 0 84% 85%;
   }
 }
 
@@ -151,25 +105,93 @@
   }
 }
 
-/* Status badge utility classes */
 @layer components {
-  .badge-active {
-    @apply bg-primary/15 text-primary border border-primary/25;
+  /* ═══ SiteSync Card System ═══ */
+  .ss-card {
+    @apply relative rounded-xl border border-border bg-card overflow-hidden;
+    box-shadow: 0 0 0 1px hsl(217 91% 60% / 0.06);
   }
-  .badge-progress {
-    @apply bg-warning/15 text-warning border border-warning/25;
+  .dark .ss-card {
+    background: linear-gradient(135deg, hsl(222 41% 10%), hsl(222 41% 8%));
+    border-color: hsl(217 91% 60% / 0.12);
+    box-shadow:
+      0 0 0 1px hsl(217 91% 60% / 0.08),
+      0 4px 24px -4px hsl(222 47% 4% / 0.5),
+      inset 0 1px 0 0 hsl(217 91% 60% / 0.04);
   }
-  .badge-complete {
-    @apply bg-success/15 text-success border border-success/25;
+  .ss-card-glow {
+    @apply ss-card;
   }
-  .badge-closed {
-    @apply bg-muted text-muted-foreground border border-border;
-  }
-  .badge-overdue {
-    @apply bg-destructive/15 text-destructive border border-destructive/25;
+  .dark .ss-card-glow {
+    border-color: hsl(217 91% 60% / 0.2);
+    box-shadow:
+      0 0 20px -4px hsl(217 91% 60% / 0.12),
+      0 0 0 1px hsl(217 91% 60% / 0.1),
+      inset 0 1px 0 0 hsl(217 91% 60% / 0.06);
   }
 
-  /* Gantt chart utilities */
+  /* ═══ Module pill cards (BUILD / OPS / VAULT) ═══ */
+  .ss-module-card {
+    @apply ss-card-glow flex flex-col items-center justify-center gap-3 p-6 cursor-pointer
+           transition-all duration-300 hover:scale-[1.02];
+  }
+  .ss-module-card:hover {
+    border-color: hsl(217 91% 60% / 0.35);
+    box-shadow: 0 0 30px -4px hsl(217 91% 60% / 0.2);
+  }
+  .ss-module-icon {
+    @apply h-16 w-16 rounded-full flex items-center justify-center;
+    background: hsl(217 91% 60% / 0.08);
+    border: 2px solid hsl(217 91% 60% / 0.25);
+    box-shadow: 0 0 16px hsl(217 91% 60% / 0.1);
+  }
+
+  /* ═══ Stat cards ═══ */
+  .ss-stat-card {
+    @apply ss-card p-5;
+  }
+  .ss-stat-value {
+    @apply text-2xl font-bold tracking-tight;
+  }
+  .ss-stat-label {
+    @apply text-xs font-medium text-muted-foreground uppercase tracking-wider;
+  }
+
+  /* ═══ Status badges ═══ */
+  .badge-active {
+    @apply bg-primary/15 text-primary border border-primary/25 text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-progress {
+    @apply bg-warning/15 text-warning border border-warning/25 text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-complete {
+    @apply bg-success/15 text-success border border-success/25 text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-closed {
+    @apply bg-muted text-muted-foreground border border-border text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-overdue {
+    @apply bg-destructive/15 text-destructive border border-destructive/25 text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-urgent {
+    @apply bg-destructive text-destructive-foreground text-xs font-bold px-2.5 py-0.5 rounded-full;
+  }
+
+  /* ═══ Glowing search bar ═══ */
+  .ss-search {
+    @apply relative rounded-full border border-border bg-secondary/50 px-4 py-2;
+    transition: all 0.3s ease;
+  }
+  .dark .ss-search {
+    background: hsl(222 41% 10% / 0.8);
+    border-color: hsl(217 91% 60% / 0.15);
+  }
+  .ss-search:focus-within {
+    border-color: hsl(217 91% 60% / 0.4);
+    box-shadow: 0 0 20px -4px hsl(217 91% 60% / 0.15);
+  }
+
+  /* ═══ Gantt chart ═══ */
   .gantt-bar {
     @apply absolute rounded transition-all duration-150;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -196,5 +218,30 @@
   }
   .gantt-dependency.critical {
     stroke: hsl(var(--destructive));
+  }
+
+  /* ═══ Animations ═══ */
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out forwards;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
   }
 }
