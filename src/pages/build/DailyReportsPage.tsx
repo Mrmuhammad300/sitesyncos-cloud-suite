@@ -231,7 +231,7 @@ export default function DailyReportsPage() {
                     <SortableHeader label="Hours" sortKey="work_hours" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
                     <TableHead className="text-xs">Weather</TableHead>
                     <SortableHeader label="Safety" sortKey="safety_incidents" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
-                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <TableHead className="w-10" />
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
