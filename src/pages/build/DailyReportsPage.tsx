@@ -196,7 +196,7 @@ export default function DailyReportsPage() {
                 </Button>
               </div>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
+                <span className="text-xs text-muted-foreground">{r.crew_count} crew · {r.work_hours}h</span>
                 <span className="text-xs text-muted-foreground">{r.crew_count} crew · {r.work_hours}h</span>
                 {r.weather && <span className="text-xs text-muted-foreground">{r.weather}</span>}
                 {r.safety_incidents > 0 && <span className="text-xs text-destructive font-medium">{r.safety_incidents} incident{r.safety_incidents > 1 ? "s" : ""}</span>}
