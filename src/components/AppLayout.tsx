@@ -1,11 +1,11 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Search, Sun, Moon, LogOut } from "lucide-react";
+import { Bell, Sun, Moon, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 
@@ -36,12 +36,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <header className="h-14 flex items-center gap-2 border-b bg-card px-4 shrink-0">
             <SidebarTrigger className="text-muted-foreground" />
             <Separator orientation="vertical" className="h-5 mx-1" />
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search projects, documents, tasks…"
-                className="pl-9 h-9 bg-muted/50 border-0 text-sm focus-visible:ring-1"
-              />
+            <div className="flex-1 max-w-md">
+              <GlobalSearch />
             </div>
             <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" size="icon" className="text-muted-foreground h-9 w-9" onClick={toggleTheme}>

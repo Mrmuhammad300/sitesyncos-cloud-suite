@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { User, Bell, Palette } from "lucide-react";
 import { toast } from "sonner";
 
+const STORAGE_KEY = "sitesyncos-appearance";
+
+function loadAppearance() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as { darkMode: boolean; compactTables: boolean; landingPage: string };
+  } catch {}
+  return { darkMode: document.documentElement.classList.contains("dark"), compactTables: false, landingPage: "dashboard" };
+}
+
 export default function SettingsPage() {
   const { user, profile, updateProfile } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
+  const [appearance, setAppearance] = useState(loadAppearance);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance));
+    document.documentElement.classList.toggle("dark", appearance.darkMode);
+    document.documentElement.dataset.compactTables = appearance.compactTables ? "true" : "false";
+  }, [appearance]);
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -135,7 +152,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Theme & Display</CardTitle>
-              <CardDescription className="text-xs">Customize the look and feel.</CardDescription>
+              <CardDescription className="text-xs">Preferences are saved locally to this device.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
@@ -143,12 +160,18 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">Dark Mode</p>
                   <p className="text-xs text-muted-foreground">Use dark theme across the platform</p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={appearance.darkMode}
+                  onCheckedChange={(v) => setAppearance((p) => ({ ...p, darkMode: v }))}
+                />
               </div>
               <Separator />
               <div className="space-y-1.5">
                 <Label className="text-xs">Default Landing Page</Label>
-                <Select defaultValue="dashboard">
+                <Select
+                  value={appearance.landingPage}
+                  onValueChange={(v) => setAppearance((p) => ({ ...p, landingPage: v }))}
+                >
                   <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dashboard">Dashboard</SelectItem>
@@ -162,7 +185,10 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">Compact Tables</p>
                   <p className="text-xs text-muted-foreground">Reduce row height in data tables</p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={appearance.compactTables}
+                  onCheckedChange={(v) => setAppearance((p) => ({ ...p, compactTables: v }))}
+                />
               </div>
             </CardContent>
           </Card>

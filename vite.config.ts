@@ -19,7 +19,13 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
+  esbuild: {
+    // Remove debugger statements; mark console.log as pure (tree-shaken) in production
+    drop: mode === "production" ? (["debugger"] as const) : [],
+    pure: mode === "production" ? ["console.log"] : [],
+  },
   build: {
+    sourcemap: mode !== "production",
     rollupOptions: {
       output: {
         manualChunks: {
