@@ -99,7 +99,7 @@ export default function DailyReportsPage() {
       report_number: "Report #", report_date: "Date", author_name: "Author",
       crew_count: "Crew", work_hours: "Hours", weather: "Weather",
       temp_high: "Temp High", temp_low: "Temp Low",
-      safety_incidents: "Safety Incidents", status: "Status",
+      safety_incidents: "Safety Incidents",
     });
   };
 
