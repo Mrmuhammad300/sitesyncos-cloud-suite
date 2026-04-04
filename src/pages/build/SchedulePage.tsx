@@ -1,41 +1,85 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, MapPin, User, BarChart2, List } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CalendarDays, MapPin, User, BarChart2, List, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { useProjects } from "@/hooks/useProjectData";
 import { useNavigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
-const STATUS_COLOR: Record<string, { bar: string; badge: string }> = {
-  "On Track": { bar: "bg-emerald-500", badge: "bg-success/10 text-success border-success/20" },
-  "At Risk":  { bar: "bg-amber-500",   badge: "bg-warning/10 text-warning border-warning/20" },
-  "Behind":   { bar: "bg-red-500",     badge: "bg-destructive/10 text-destructive border-destructive/20" },
-  "Complete": { bar: "bg-primary",     badge: "bg-primary/10 text-primary border-primary/20" },
+const STATUS_CONFIG: Record<string, { bar: string; badge: string; label: string }> = {
+  "On Track": { bar: "bg-primary", badge: "badge-active", label: "On Track" },
+  "At Risk":  { bar: "bg-warning", badge: "badge-progress", label: "At Risk" },
+  "Behind":   { bar: "bg-destructive", badge: "badge-overdue", label: "Behind" },
+  "Complete": { bar: "bg-success", badge: "badge-complete", label: "Complete" },
 };
 
 function parseDate(d: string | null): Date | null {
   return d ? new Date(d) : null;
 }
-
 function formatDate(d: string | null, opts?: Intl.DateTimeFormatOptions) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", opts ?? { month: "short", day: "numeric", year: "numeric" });
 }
-
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-/* ─── Gantt Bar Chart ─── */
+/* ─── Interactive Gantt ─── */
 interface GanttProps { projects: Project[] }
 
 function GanttChart({ projects }: GanttProps) {
-  const withDates = projects.filter((p) => p.start_date && p.end_date);
+  const [zoom, setZoom] = useState(1);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const withDates = useMemo(
+    () => projects.filter((p) => p.start_date && p.end_date),
+    [projects]
+  );
+
+  const { minDate, maxDate, totalDays } = useMemo(() => {
+    if (withDates.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 1 };
+    const starts = withDates.map((p) => parseDate(p.start_date)!);
+    const ends = withDates.map((p) => parseDate(p.end_date)!);
+    const min = new Date(Math.min(...starts.map((d) => d.getTime())));
+    const max = new Date(Math.max(...ends.map((d) => d.getTime())));
+    // Add 5% padding on each side
+    const pad = Math.max(daysBetween(min, max) * 0.05, 7);
+    min.setDate(min.getDate() - pad);
+    max.setDate(max.getDate() + pad);
+    return { minDate: min, maxDate: max, totalDays: Math.max(daysBetween(min, max), 1) };
+  }, [withDates]);
+
+  const months = useMemo(() => {
+    const result: { label: string; leftPct: number }[] = [];
+    const cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    while (cursor <= maxDate) {
+      const pct = (daysBetween(minDate, cursor) / totalDays) * 100;
+      if (pct >= 0 && pct <= 100) {
+        result.push({
+          label: cursor.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+          leftPct: pct,
+        });
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return result;
+  }, [minDate, maxDate, totalDays]);
+
+  const today = new Date();
+  const todayPct = Math.min(Math.max((daysBetween(minDate, today) / totalDays) * 100, 0), 100);
+  const chartWidth = Math.max(640, 640 * zoom);
+  const ROW_H = 40;
+  const BAR_H = 24;
+  const BAR_Y_OFFSET = (ROW_H - BAR_H) / 2;
+
   if (withDates.length === 0) {
     return (
       <div className="py-12 text-center text-muted-foreground text-sm">
@@ -44,120 +88,222 @@ function GanttChart({ projects }: GanttProps) {
     );
   }
 
-  // Compute time window
-  const allStarts = withDates.map((p) => parseDate(p.start_date)!);
-  const allEnds   = withDates.map((p) => parseDate(p.end_date)!);
-  const minDate   = new Date(Math.min(...allStarts.map((d) => d.getTime())));
-  const maxDate   = new Date(Math.max(...allEnds.map((d) => d.getTime())));
-  const totalDays = Math.max(daysBetween(minDate, maxDate), 1);
-
-  // Build month labels
-  const months: { label: string; leftPct: number }[] = [];
-  const cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-  while (cursor <= maxDate) {
-    const pct = (daysBetween(minDate, cursor) / totalDays) * 100;
-    if (pct >= 0 && pct <= 100) {
-      months.push({
-        label: cursor.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-        leftPct: pct,
-      });
-    }
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  // Today marker
-  const today = new Date();
-  const todayPct = Math.min(Math.max((daysBetween(minDate, today) / totalDays) * 100, 0), 100);
+  const scrollToToday = () => {
+    if (!scrollRef.current) return;
+    const containerW = scrollRef.current.clientWidth;
+    const scrollTarget = (todayPct / 100) * chartWidth - containerW / 2;
+    scrollRef.current.scrollTo({ left: scrollTarget, behavior: "smooth" });
+  };
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[640px]">
-        {/* Month header */}
-        <div className="relative h-7 border-b mb-1 ml-40">
-          {months.map((m) => (
-            <span
-              key={m.label}
-              className="absolute text-[10px] text-muted-foreground font-medium select-none"
-              style={{ left: `${m.leftPct}%`, transform: "translateX(-50%)" }}
-            >
-              {m.label}
-            </span>
-          ))}
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}>
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <span className="text-xs text-muted-foreground w-12 text-center">{Math.round(zoom * 100)}%</span>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(3, z + 0.25))}>
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
         </div>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={scrollToToday}>
+          <CalendarDays className="h-3 w-3 mr-1" /> Today
+        </Button>
+      </div>
 
-        {/* Rows */}
-        <div className="space-y-1.5">
-          {withDates.map((proj) => {
-            const start = parseDate(proj.start_date)!;
-            const end   = parseDate(proj.end_date)!;
-            const leftPct  = (daysBetween(minDate, start) / totalDays) * 100;
-            const widthPct = Math.max((daysBetween(start, end) / totalDays) * 100, 0.5);
-            const colors   = STATUS_COLOR[proj.status] ?? STATUS_COLOR["On Track"];
+      <div ref={scrollRef} className="overflow-x-auto rounded-lg border bg-card">
+        <div style={{ width: chartWidth }} className="min-w-full">
+          {/* SVG arrow marker definition */}
+          <svg width="0" height="0" className="absolute">
+            <defs>
+              <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" className="fill-muted-foreground" />
+              </marker>
+            </defs>
+          </svg>
 
-            return (
-              <div key={proj.id} className="flex items-center gap-0">
-                {/* Label */}
-                <div className="w-40 shrink-0 pr-3 text-right">
-                  <p className="text-xs font-medium truncate">{proj.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{proj.status}</p>
-                </div>
+          {/* Month header */}
+          <div className="relative h-8 border-b bg-muted/30 ml-48" style={{ width: `calc(100% - 12rem)` }}>
+            {months.map((m) => (
+              <span
+                key={m.label}
+                className="absolute text-[11px] text-muted-foreground font-semibold select-none top-1/2 -translate-y-1/2"
+                style={{ left: `${m.leftPct}%`, transform: `translateX(-50%) translateY(-50%)` }}
+              >
+                {m.label}
+              </span>
+            ))}
+          </div>
 
-                {/* Bar track */}
-                <div className="relative flex-1 h-8 bg-muted/30 rounded overflow-hidden">
-                  {/* Today line */}
-                  <div
-                    className="absolute top-0 bottom-0 w-px bg-primary/60 z-10"
-                    style={{ left: `${todayPct}%` }}
-                  />
+          {/* Grid lines */}
+          <div className="relative" style={{ height: withDates.length * ROW_H }}>
+            {/* Vertical month grid lines */}
+            {months.map((m) => (
+              <div
+                key={`grid-${m.label}`}
+                className="absolute top-0 bottom-0 w-px bg-border/50"
+                style={{ left: `calc(12rem + ${m.leftPct}% * (100% - 12rem) / 100)` }}
+              />
+            ))}
 
-                  {/* Project bar */}
-                  <div
-                    className={`absolute top-1 bottom-1 rounded ${colors.bar} flex items-center px-2 overflow-hidden`}
-                    style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    title={`${proj.name}: ${formatDate(proj.start_date, { month: "short", day: "numeric" })} → ${formatDate(proj.end_date, { month: "short", day: "numeric" })}`}
-                  >
-                    {widthPct > 8 && (
-                      <span className="text-[10px] text-white font-semibold truncate">
-                        {proj.progress}%
-                      </span>
-                    )}
+            {/* Today marker */}
+            <div
+              className="gantt-today"
+              style={{ left: `calc(12rem + (100% - 12rem) * ${todayPct / 100})` }}
+            />
+
+            {/* Row stripes + bars */}
+            {withDates.map((proj, i) => {
+              const start = parseDate(proj.start_date)!;
+              const end = parseDate(proj.end_date)!;
+              const leftPct = (daysBetween(minDate, start) / totalDays) * 100;
+              const widthPct = Math.max((daysBetween(start, end) / totalDays) * 100, 0.5);
+              const config = STATUS_CONFIG[proj.status] ?? STATUS_CONFIG["On Track"];
+              const isHovered = hoveredId === proj.id;
+              const isSelected = selectedId === proj.id;
+              const isCritical = proj.status === "Behind";
+              const isMilestone = daysBetween(start, end) <= 1;
+              const isDelayed = proj.status === "At Risk";
+
+              return (
+                <div
+                  key={proj.id}
+                  className={`flex items-center h-[${ROW_H}px] ${i % 2 === 0 ? '' : 'bg-muted/20'} ${isSelected ? 'bg-primary/5' : ''}`}
+                  style={{ height: ROW_H }}
+                >
+                  {/* Label column */}
+                  <div className="w-48 shrink-0 px-3 flex items-center gap-2 border-r bg-card">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate leading-tight">{proj.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{proj.project_manager ?? "—"}</p>
+                    </div>
                   </div>
 
-                  {/* Progress fill overlay */}
-                  <div
-                    className="absolute top-1 bottom-1 rounded bg-black/20"
-                    style={{
-                      left: `${leftPct}%`,
-                      width: `${(widthPct * proj.progress) / 100}%`,
-                    }}
-                  />
+                  {/* Bar area */}
+                  <div className="relative flex-1" style={{ height: ROW_H }}>
+                    {isMilestone ? (
+                      /* Milestone diamond */
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className="gantt-milestone cursor-pointer"
+                            style={{
+                              left: `${leftPct}%`,
+                              top: ROW_H / 2 - 8,
+                            }}
+                            onClick={() => setSelectedId(selectedId === proj.id ? null : proj.id)}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          <p className="font-semibold">{proj.name}</p>
+                          <p>{formatDate(proj.start_date, { month: "short", day: "numeric" })}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      /* Task bar */
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`gantt-bar cursor-pointer ${isCritical ? 'bg-destructive' : isDelayed ? 'bg-warning' : config.bar} ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+                            style={{
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              top: BAR_Y_OFFSET,
+                              height: BAR_H,
+                              borderRadius: 4,
+                              opacity: isHovered ? 1 : 0.9,
+                            }}
+                            onMouseEnter={() => setHoveredId(proj.id)}
+                            onMouseLeave={() => setHoveredId(null)}
+                            onClick={() => setSelectedId(selectedId === proj.id ? null : proj.id)}
+                          >
+                            {/* Progress fill */}
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-l bg-black/20"
+                              style={{ width: `${proj.progress}%`, borderRadius: 4 }}
+                            />
+                            {widthPct > 6 && (
+                              <span className="relative z-10 px-2 text-[10px] text-white font-semibold leading-[24px] truncate block">
+                                {proj.progress}%
+                              </span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-1">
+                            <p className="font-semibold text-sm">{proj.name}</p>
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              <p>{formatDate(proj.start_date, { month: "short", day: "numeric" })} → {formatDate(proj.end_date, { month: "short", day: "numeric", year: "numeric" })}</p>
+                              <p>Progress: {proj.progress}% · Status: {proj.status}</p>
+                              {proj.project_manager && <p>PM: {proj.project_manager}</p>}
+                              <p>Budget: ${(proj.budget / 1e6).toFixed(1)}M · Spent: ${(proj.spent / 1e6).toFixed(1)}M</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-4 ml-40">
-          {Object.entries(STATUS_COLOR).map(([status, { bar }]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <div className={`h-2.5 w-5 rounded-sm ${bar}`} />
-              <span className="text-[10px] text-muted-foreground">{status}</span>
+          {/* Legend */}
+          <div className="flex items-center gap-5 px-3 py-2.5 border-t bg-muted/20">
+            {Object.entries(STATUS_CONFIG).map(([status, { bar }]) => (
+              <div key={status} className="flex items-center gap-1.5">
+                <div className={`h-3 w-6 rounded-sm ${bar}`} />
+                <span className="text-[11px] text-muted-foreground font-medium">{status}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-1.5">
+              <div className="h-3 w-0 border-l-2 border-dashed border-primary" />
+              <span className="text-[11px] text-muted-foreground font-medium">Today</span>
             </div>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-px bg-primary/60" />
-            <span className="text-[10px] text-muted-foreground">Today</span>
+            <div className="flex items-center gap-1.5">
+              <div className="h-3 w-3 rotate-45 bg-success rounded-sm" />
+              <span className="text-[11px] text-muted-foreground font-medium">Milestone</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Selected project detail */}
+      {selectedId && (() => {
+        const proj = withDates.find(p => p.id === selectedId);
+        if (!proj) return null;
+        const config = STATUS_CONFIG[proj.status] ?? STATUS_CONFIG["On Track"];
+        return (
+          <Card className="animate-fade-in">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-sm font-semibold">{proj.name}</h3>
+                    <Badge variant="outline" className={`text-[10px] ${config.badge}`}>{proj.status}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div><p className="text-muted-foreground">Duration</p><p className="font-medium">{formatDate(proj.start_date, { month: "short", day: "numeric" })} — {formatDate(proj.end_date, { month: "short", day: "numeric" })}</p></div>
+                    <div><p className="text-muted-foreground">Progress</p><p className="font-medium">{proj.progress}%</p></div>
+                    <div><p className="text-muted-foreground">Budget</p><p className="font-medium">${(proj.budget / 1e6).toFixed(1)}M</p></div>
+                    <div><p className="text-muted-foreground">Team</p><p className="font-medium">{proj.team_size} members</p></div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedId(null)}>✕</Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
 
 /* ─── Timeline (list) view ─── */
 function TimelineView({ projects }: { projects: Project[] }) {
-  const active   = projects.filter((p) => p.status !== "Complete");
+  const active = projects.filter((p) => p.status !== "Complete");
   const complete = projects.filter((p) => p.status === "Complete");
 
   return (
@@ -175,16 +321,16 @@ function TimelineView({ projects }: { projects: Project[] }) {
             const timePct = duration && elapsed !== null
               ? Math.min(Math.max(Math.round((elapsed / duration) * 100), 0), 100)
               : null;
-            const colors = STATUS_COLOR[proj.status] ?? STATUS_COLOR["On Track"];
+            const config = STATUS_CONFIG[proj.status] ?? STATUS_CONFIG["On Track"];
 
             return (
-              <Card key={proj.id}>
+              <Card key={proj.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-sm font-semibold truncate">{proj.name}</p>
-                        <Badge variant="outline" className={`text-[10px] shrink-0 ${colors.badge}`}>
+                        <Badge variant="outline" className={`text-[10px] shrink-0 ${config.badge}`}>
                           {proj.status}
                         </Badge>
                       </div>
@@ -239,7 +385,7 @@ function TimelineView({ projects }: { projects: Project[] }) {
                     {proj.project_manager ? ` · ${proj.project_manager}` : ""}
                   </p>
                 </div>
-                <Badge variant="outline" className={`text-[10px] ${STATUS_COLOR["Complete"].badge}`}>Complete</Badge>
+                <Badge variant="outline" className={`text-[10px] ${STATUS_CONFIG["Complete"].badge}`}>Complete</Badge>
               </CardContent>
             </Card>
           ))}
@@ -254,9 +400,9 @@ export default function SchedulePage() {
   const { data: projects = [], isLoading } = useProjects();
   const navigate = useNavigate();
 
-  const active   = projects.filter((p) => p.status !== "Complete");
-  const onTrack  = projects.filter((p) => p.status === "On Track").length;
-  const atRisk   = projects.filter((p) => p.status === "At Risk" || p.status === "Behind").length;
+  const active = projects.filter((p) => p.status !== "Complete");
+  const onTrack = projects.filter((p) => p.status === "On Track").length;
+  const atRisk = projects.filter((p) => p.status === "At Risk" || p.status === "Behind").length;
   const avgProgress = projects.length
     ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
     : 0;
@@ -275,10 +421,30 @@ export default function SchedulePage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Projects</p><p className="text-xl font-bold">{projects.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active</p><p className="text-xl font-bold text-primary">{active.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">On Track</p><p className="text-xl font-bold text-emerald-500">{onTrack}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Progress</p><p className="text-xl font-bold">{avgProgress}%</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Total Projects</p>
+            <p className="text-xl font-bold">{projects.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Active</p>
+            <p className="text-xl font-bold text-primary">{active.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">On Track</p>
+            <p className="text-xl font-bold text-success">{onTrack}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">At Risk</p>
+            <p className="text-xl font-bold text-warning">{atRisk}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {isLoading ? (
