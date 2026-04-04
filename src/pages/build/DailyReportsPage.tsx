@@ -89,8 +89,8 @@ export default function DailyReportsPage() {
     });
   };
 
-  const handleBulkStatusUpdate = (status: string) => {
-    selectedItems.forEach(r => updateReport.mutate({ id: r.id, status }));
+  const handleBulkDelete = () => {
+    selectedItems.forEach(r => deleteReport.mutate(r.id));
     clearSelection();
   };
 
