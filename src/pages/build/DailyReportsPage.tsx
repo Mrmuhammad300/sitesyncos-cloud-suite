@@ -49,8 +49,7 @@ export default function DailyReportsPage() {
   const filtered = reports.filter(r => {
     const ms = r.report_number.toLowerCase().includes(search.toLowerCase()) ||
       (r.author_name ?? "").toLowerCase().includes(search.toLowerCase());
-    const mst = statusFilter === "all" || r.status === statusFilter;
-    return ms && mst;
+    return ms;
   });
 
   const {
@@ -80,7 +79,6 @@ export default function DailyReportsPage() {
       summary: form.summary || null,
       safety_incidents: Number(form.safety_incidents) || 0,
       delay_hours: 0,
-      status: "Draft",
     });
     setOpen(false);
     setForm({
@@ -91,8 +89,8 @@ export default function DailyReportsPage() {
     });
   };
 
-  const handleBulkStatusUpdate = (status: string) => {
-    selectedItems.forEach(r => updateReport.mutate({ id: r.id, status }));
+  const handleBulkDelete = () => {
+    selectedItems.forEach(r => deleteReport.mutate(r.id));
     clearSelection();
   };
 
@@ -101,12 +99,12 @@ export default function DailyReportsPage() {
       report_number: "Report #", report_date: "Date", author_name: "Author",
       crew_count: "Crew", work_hours: "Hours", weather: "Weather",
       temp_high: "Temp High", temp_low: "Temp Low",
-      safety_incidents: "Safety Incidents", status: "Status",
+      safety_incidents: "Safety Incidents",
     });
   };
 
   const handlePrintPDF = () => {
-    const cols = ["Report #", "Date", "Author", "Crew", "Hours", "Weather", "Safety", "Status"];
+    const cols = ["Report #", "Date", "Author", "Crew", "Hours", "Weather", "Safety"];
     const rows_html = filtered.map(r => `<tr>
       <td>${r.report_number}</td>
       <td>${r.report_date}</td>
@@ -115,7 +113,6 @@ export default function DailyReportsPage() {
       <td>${r.work_hours}h</td>
       <td>${r.weather ?? "—"}</td>
       <td>${r.safety_incidents}</td>
-      <td>${r.status}</td>
     </tr>`).join("");
     printToPDF("Daily Reports", `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows_html}</tbody></table>`);
   };
@@ -199,7 +196,7 @@ export default function DailyReportsPage() {
                 </Button>
               </div>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
+                <span className="text-xs text-muted-foreground">{r.crew_count} crew · {r.work_hours}h</span>
                 <span className="text-xs text-muted-foreground">{r.crew_count} crew · {r.work_hours}h</span>
                 {r.weather && <span className="text-xs text-muted-foreground">{r.weather}</span>}
                 {r.safety_incidents > 0 && <span className="text-xs text-destructive font-medium">{r.safety_incidents} incident{r.safety_incidents > 1 ? "s" : ""}</span>}
@@ -234,7 +231,7 @@ export default function DailyReportsPage() {
                     <SortableHeader label="Hours" sortKey="work_hours" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
                     <TableHead className="text-xs">Weather</TableHead>
                     <SortableHeader label="Safety" sortKey="safety_incidents" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
-                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof DailyReport)} />
+                    <TableHead className="w-10" />
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -258,19 +255,6 @@ export default function DailyReportsPage() {
                         {r.safety_incidents > 0
                           ? <span className="text-destructive font-medium">{r.safety_incidents}</span>
                           : <span className="text-success">0</span>}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={r.status}
-                          onValueChange={v => updateReport.mutate({ id: r.id, status: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[110px] text-[10px] border-0 p-0">
-                            <Badge variant="outline" className={`text-[10px] ${statusColor[r.status] ?? ""}`}>{r.status}</Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
                       </TableCell>
                       <TableCell>
                         <Button
@@ -351,14 +335,11 @@ export default function DailyReportsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Action Bar */}
       <BulkActionBar
         count={selectedCount}
         onClear={clearSelection}
         actions={[
-          { label: "Draft", onClick: () => handleBulkStatusUpdate("Draft") },
-          { label: "Submitted", onClick: () => handleBulkStatusUpdate("Submitted") },
-          { label: "Approved", onClick: () => handleBulkStatusUpdate("Approved") },
+          { label: "Delete Selected", onClick: () => handleBulkDelete() },
         ]}
       />
     </div>
