@@ -307,10 +307,10 @@ export default function ProjectsPage() {
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* Create / Edit Dialog */}
+      <Dialog open={open} onOpenChange={o => { if (!o) { setOpen(false); setEditingProject(null); } else setOpen(true); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingProject ? "Edit Project" : "New Project"}</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div><Label className="text-xs">Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div><Label className="text-xs">Location</Label><Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
@@ -324,13 +324,18 @@ export default function ProjectsPage() {
                 </Select>
               </div>
             </div>
-            <div><Label className="text-xs">Budget ($)</Label><Input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Budget ($)</Label><Input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
+              <div><Label className="text-xs">Progress (%)</Label><Input type="number" min="0" max="100" value={form.progress} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} /></div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Start Date</Label><Input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></div>
               <div><Label className="text-xs">End Date</Label><Input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} /></div>
             </div>
-            <Button className="w-full" onClick={handleSubmit} disabled={!form.name || createProject.isPending}>
-              {createProject.isPending ? "Creating…" : "Create Project"}
+            <Button className="w-full" onClick={handleSubmit} disabled={!form.name || createProject.isPending || updateProject.isPending}>
+              {editingProject
+                ? (updateProject.isPending ? "Saving…" : "Save Changes")
+                : (createProject.isPending ? "Creating…" : "Create Project")}
             </Button>
           </div>
         </DialogContent>
