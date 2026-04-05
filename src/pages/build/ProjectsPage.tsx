@@ -192,6 +192,9 @@ export default function ProjectsPage() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Badge variant="outline" className={`text-[10px] ${statusColor[proj.status] ?? ""}`}>{proj.status}</Badge>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
