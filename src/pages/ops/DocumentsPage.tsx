@@ -171,7 +171,7 @@ const DocumentsPage = () => {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="ss-card-glow">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>

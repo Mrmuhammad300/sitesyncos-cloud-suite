@@ -98,11 +98,11 @@ export default function CompliancePage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Compliance Score</p><p className="text-2xl font-bold">{score}%</p><Progress value={score} className="h-1.5 mt-2" /></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Compliance Score</p><p className="ss-stat-value">{score}%</p><Progress value={score} className="h-1.5 mt-2" /></CardContent></Card>
         {(["Compliant", "Pending", "Non-Compliant"] as const).map(s => {
           const count = items.filter(i => i.status === s).length;
           const cfg = statusConfig[s];
-          return <Card key={s}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{s}</p><p className={`text-2xl font-bold ${cfg.color}`}>{count}</p></CardContent></Card>;
+          return <Card key={s} className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">{s}</p><p className={`ss-stat-value ${cfg.color}`}>{count}</p></CardContent></Card>;
         })}
       </div>
 

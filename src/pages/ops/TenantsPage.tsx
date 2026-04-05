@@ -133,7 +133,7 @@ const TenantsPage = () => {
         ))}
       </div>
 
-      <Card className="hidden sm:block"><CardContent className="p-0">
+      <Card className="hidden sm:block ss-card-glow"><CardContent className="p-0">
         {isLoading ? <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div> : (
           <>
             <Table>

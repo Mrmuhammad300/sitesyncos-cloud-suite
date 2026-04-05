@@ -164,10 +164,10 @@ export default function SubmittalsPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-bold">{submittals.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Under Review</p><p className="text-xl font-bold text-warning">{underReview}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Approved</p><p className="text-xl font-bold text-success">{approved}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Rejected</p><p className="text-xl font-bold text-destructive">{rejected}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total</p><p className="ss-stat-value">{submittals.length}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Under Review</p><p className="ss-stat-value text-warning">{underReview}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Approved</p><p className="ss-stat-value text-success">{approved}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Rejected</p><p className="ss-stat-value text-destructive">{rejected}</p></CardContent></Card>
       </div>
 
       {/* Filters */}
