@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtDollar } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
