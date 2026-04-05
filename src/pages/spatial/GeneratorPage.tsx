@@ -226,7 +226,7 @@ export default function GeneratorPage() {
           <Card>
             <CardContent className="p-0">
               <div className="aspect-[16/9] rounded-lg overflow-hidden bg-muted/20">
-                <Canvas shadows>
+                <Canvas>
                   <Suspense fallback={<Html center><div className="text-xs text-muted-foreground">Loading…</div></Html>}>
                     <PlaceholderScene />
                   </Suspense>

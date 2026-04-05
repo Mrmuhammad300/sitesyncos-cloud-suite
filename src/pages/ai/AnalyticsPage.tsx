@@ -41,7 +41,7 @@ export default function AnalyticsPage() {
         : 0;
       const onTrackCount = projects.filter(p => p.status === "On Track" || p.status === "Complete").length;
       const onTimeRate = projects.length ? Math.round((onTrackCount / projects.length) * 100) : 0;
-      return { totalBudget, totalSpent, budgetEfficiency, openRFIs, criticalRFIs, avgProgress, onTimeRate };
+      return { budgetEfficiency, openRFIs, criticalRFIs, avgProgress, onTimeRate };
     }, [projects, rfis]);
 
   // Project status breakdown for pie chart
