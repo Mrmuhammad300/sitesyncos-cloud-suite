@@ -188,7 +188,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Table (hidden on mobile) */}
-      <Card className="hidden sm:block">
+      <Card className="hidden sm:block ss-card-glow">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
