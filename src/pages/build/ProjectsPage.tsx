@@ -138,7 +138,7 @@ export default function ProjectsPage() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
-          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Project</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1.5" />New Project</Button>
         </div>
       </div>
 
