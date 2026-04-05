@@ -288,7 +288,7 @@ function GanttChart({ projects }: GanttProps) {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div><p className="text-muted-foreground">Duration</p><p className="font-medium">{formatDate(proj.start_date, { month: "short", day: "numeric" })} — {formatDate(proj.end_date, { month: "short", day: "numeric" })}</p></div>
                     <div><p className="text-muted-foreground">Progress</p><p className="font-medium">{proj.progress}%</p></div>
-                    <div><p className="text-muted-foreground">Budget</p><p className="font-medium">${(proj.budget / 1e6).toFixed(1)}M</p></div>
+                    <div><p className="text-muted-foreground">Budget</p><p className="font-medium">{fmtDollar(proj.budget)}</p></div>
                     <div><p className="text-muted-foreground">Team</p><p className="font-medium">{proj.team_size} members</p></div>
                   </div>
                 </div>

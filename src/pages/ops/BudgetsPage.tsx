@@ -55,8 +55,8 @@ const BudgetsPage = () => {
   const utilization = totalAllocated > 0 ? Math.round((totalSpent / totalAllocated) * 100) : 0;
 
   const kpis = [
-    { label: "Total Allocated", value: `$${(totalAllocated / 1e6).toFixed(1)}M`, icon: <DollarSign className="h-5 w-5 text-primary" /> },
-    { label: "Total Spent", value: `$${(totalSpent / 1e6).toFixed(1)}M`, icon: <TrendingUp className="h-5 w-5 text-success" /> },
+    { label: "Total Allocated", value: fmtDollar(totalAllocated), icon: <DollarSign className="h-5 w-5 text-primary" /> },
+    { label: "Total Spent", value: fmtDollar(totalSpent), icon: <TrendingUp className="h-5 w-5 text-success" /> },
     { label: "Utilization", value: `${utilization}%`, icon: <PieChart className="h-5 w-5 text-accent" /> },
     { label: "Over Budget", value: budgets.filter(b => Number(b.spent) > Number(b.allocated)).length, icon: <AlertTriangle className="h-5 w-5 text-destructive" /> },
   ];
