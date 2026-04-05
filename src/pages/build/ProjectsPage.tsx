@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MapPin, Trash2, Download } from "lucide-react";
+import { Plus, Search, MapPin, Trash2, Download, Pencil } from "lucide-react";
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
@@ -42,11 +42,32 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "", location: "", project_manager: "", status: "On Track",
-    budget: "", start_date: "", end_date: "",
-  });
+
+  const emptyForm = { name: "", location: "", project_manager: "", status: "On Track", budget: "", start_date: "", end_date: "", progress: "" };
+  const [form, setForm] = useState(emptyForm);
+
+  const openEdit = (p: Project) => {
+    setEditingProject(p);
+    setForm({
+      name: p.name,
+      location: p.location ?? "",
+      project_manager: p.project_manager ?? "",
+      status: p.status,
+      budget: String(p.budget),
+      start_date: p.start_date ?? "",
+      end_date: p.end_date ?? "",
+      progress: String(p.progress),
+    });
+    setOpen(true);
+  };
+
+  const openCreate = () => {
+    setEditingProject(null);
+    setForm(emptyForm);
+    setOpen(true);
+  };
 
   const filtered = projects.filter(p => {
     const ms = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -72,7 +93,7 @@ export default function ProjectsPage() {
 
   const handleSubmit = () => {
     if (!form.name) return;
-    createProject.mutate({
+    const payload = {
       name: form.name,
       location: form.location || null,
       project_manager: form.project_manager || null,
@@ -80,9 +101,16 @@ export default function ProjectsPage() {
       budget: Number(form.budget) || 0,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-    });
+      progress: Number(form.progress) || 0,
+    };
+    if (editingProject) {
+      updateProject.mutate({ id: editingProject.id, ...payload });
+    } else {
+      createProject.mutate(payload);
+    }
     setOpen(false);
-    setForm({ name: "", location: "", project_manager: "", status: "On Track", budget: "", start_date: "", end_date: "" });
+    setEditingProject(null);
+    setForm(emptyForm);
   };
 
   const handleBulkStatusUpdate = (status: string) => {
@@ -110,7 +138,7 @@ export default function ProjectsPage() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
-          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Project</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1.5" />New Project</Button>
         </div>
       </div>
 
@@ -164,6 +192,9 @@ export default function ProjectsPage() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Badge variant="outline" className={`text-[10px] ${statusColor[proj.status] ?? ""}`}>{proj.status}</Badge>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -250,14 +281,14 @@ export default function ProjectsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeleteId(proj.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -276,10 +307,10 @@ export default function ProjectsPage() {
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* Create / Edit Dialog */}
+      <Dialog open={open} onOpenChange={o => { if (!o) { setOpen(false); setEditingProject(null); } else setOpen(true); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingProject ? "Edit Project" : "New Project"}</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div><Label className="text-xs">Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div><Label className="text-xs">Location</Label><Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
@@ -293,13 +324,18 @@ export default function ProjectsPage() {
                 </Select>
               </div>
             </div>
-            <div><Label className="text-xs">Budget ($)</Label><Input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">Budget ($)</Label><Input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
+              <div><Label className="text-xs">Progress (%)</Label><Input type="number" min="0" max="100" value={form.progress} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} /></div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Start Date</Label><Input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></div>
               <div><Label className="text-xs">End Date</Label><Input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} /></div>
             </div>
-            <Button className="w-full" onClick={handleSubmit} disabled={!form.name || createProject.isPending}>
-              {createProject.isPending ? "Creating…" : "Create Project"}
+            <Button className="w-full" onClick={handleSubmit} disabled={!form.name || createProject.isPending || updateProject.isPending}>
+              {editingProject
+                ? (updateProject.isPending ? "Saving…" : "Save Changes")
+                : (createProject.isPending ? "Creating…" : "Create Project")}
             </Button>
           </div>
         </DialogContent>
