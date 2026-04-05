@@ -186,10 +186,10 @@ export default function ClashAnalysisPage() {
             { label: "Major", value: majorCount, cls: "text-amber-500" },
             { label: "Minor", value: minorCount, cls: "text-blue-500" },
           ].map((s) => (
-            <Card key={s.label}>
-              <CardContent className="p-4 text-center">
-                <p className={`text-2xl font-bold ${s.cls}`}>{s.value}</p>
-                <p className="text-[11px] text-muted-foreground">{s.label}</p>
+            <Card key={s.label} className="ss-stat-card">
+              <CardContent className="p-0 text-center">
+                <p className={`ss-stat-value ${s.cls}`}>{s.value}</p>
+                <p className="ss-stat-label">{s.label}</p>
               </CardContent>
             </Card>
           ))}
