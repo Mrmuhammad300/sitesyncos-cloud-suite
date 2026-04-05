@@ -58,7 +58,7 @@ export default function PropertiesPage() {
     setForm({ name: "", address: "", property_type: "Office", status: "Active", price: "", sqft: "", cap_rate: "", noi: "", irr: "", year_built: "", units: "", occupancy: "" });
   };
 
-  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+  const fmt = fmtDollar;
 
   return (
     <div className="space-y-6 animate-fade-in">

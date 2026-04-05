@@ -30,7 +30,7 @@ const statusColor: Record<string, string> = {
 const STATUSES = ["Pending", "Under Review", "Approved", "Rejected"] as const;
 const CATEGORIES = ["Scope Addition", "Scope Reduction", "Design Change", "Unforeseen Conditions", "Owner Request", "Other"] as const;
 
-const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : `$${v.toLocaleString()}`;
+const fmt = fmtDollar;
 
 export default function ChangeOrdersPage() {
   const { data: changeOrders = [], isLoading } = useChangeOrders();

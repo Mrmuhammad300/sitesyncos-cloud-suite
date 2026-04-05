@@ -63,7 +63,7 @@ export default function ROICalculatorPage() {
   }
   const irr = (((lo + hi) / 2) * 100).toFixed(1);
 
-  const fmt = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${(n / 1e3).toFixed(0)}K`);
+  const fmt = fmtDollar;
 
   return (
     <div className="space-y-6 animate-fade-in">

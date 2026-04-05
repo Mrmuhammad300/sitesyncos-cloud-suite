@@ -34,7 +34,7 @@ export default function TreasuryPage() {
   const totalCredit = transactions.reduce((s, t) => s + Number(t.credit || 0), 0);
   const pendingCount = approvals.filter(a => a.status === "Pending").length;
 
-  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+  const fmt = fmtDollar;
 
   const handleSubmit = () => {
     create.mutate({
