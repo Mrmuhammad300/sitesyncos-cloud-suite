@@ -49,6 +49,7 @@ export default function RFIsPage() {
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ subject: "", description: "", priority: "Medium", assigned_to: "", due_date: "" });
+  const [formError, setFormError] = useState("");
 
   const filtered = rfis.filter(r => {
     const ms = r.subject.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +74,8 @@ export default function RFIsPage() {
   const nextNumber = `RFI-${String(rfis.length + 1).padStart(4, "0")}`;
 
   const handleSubmit = () => {
-    if (!form.subject) return;
+    if (!form.subject.trim()) { setFormError("Subject is required."); return; }
+    setFormError("");
     createRFI.mutate({
       subject: form.subject,
       description: form.description || null,
@@ -276,11 +278,15 @@ export default function RFIsPage() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFormError(""); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>New RFI</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Subject *</Label><Input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Subject *</Label>
+              <Input value={form.subject} onChange={e => { setForm(f => ({ ...f, subject: e.target.value })); setFormError(""); }} className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label className="text-xs">Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div>

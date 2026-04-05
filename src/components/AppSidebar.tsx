@@ -13,8 +13,12 @@ import {
   SidebarHeader, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { useRole, AppRole } from "@/hooks/useRole";
 
-const moduleGroups = [
+type NavItem = { title: string; url: string; icon: React.ElementType; roles?: AppRole[] };
+type NavGroup = { label: string; items: NavItem[] };
+
+const moduleGroups: NavGroup[] = [
   {
     label: "Overview",
     items: [
@@ -84,9 +88,9 @@ const moduleGroups = [
   {
     label: "System",
     items: [
-      { title: "Team", url: "/team", icon: UserCog },
-      { title: "Audit Log", url: "/audit-log", icon: ScrollText },
-      { title: "Webhooks", url: "/webhooks", icon: Webhook },
+      { title: "Team", url: "/team", icon: UserCog, roles: ["admin", "super_admin"] as AppRole[] },
+      { title: "Audit Log", url: "/audit-log", icon: ScrollText, roles: ["admin", "super_admin"] as AppRole[] },
+      { title: "Webhooks", url: "/webhooks", icon: Webhook, roles: ["admin", "super_admin"] as AppRole[] },
       { title: "Settings", url: "/settings", icon: Settings },
     ],
   },
@@ -96,6 +100,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { hasRole } = useRole();
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -121,21 +126,23 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild size="sm">
-                      <NavLink
-                        to={item.url}
-                        end={item.url === "/"}
-                        className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-semibold"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {group.items
+                  .filter((item) => !item.roles || hasRole(item.roles))
+                  .map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild size="sm">
+                        <NavLink
+                          to={item.url}
+                          end={item.url === "/"}
+                          className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                          activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-semibold"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
               </SidebarMenu>
             </SidebarGroupContent>
             {gi < moduleGroups.length - 1 && <Separator className="my-2 bg-sidebar-border" />}

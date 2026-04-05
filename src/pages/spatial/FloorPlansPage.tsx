@@ -3,36 +3,63 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Home, ZoomIn, ZoomOut, Maximize2, Grid3X3, Ruler, Wand2, CheckCircle2, XCircle } from "lucide-react";
+import { Home, ZoomIn, ZoomOut, Maximize2, Grid3X3, Ruler, Wand2, CheckCircle2, XCircle, Plus } from "lucide-react";
 import { useFloorPlanVariants, useUpdateFloorPlanVariant } from "@/hooks/useBlenderData";
+import { useFloorPlans, useFloorPlanRooms, useCreateFloorPlan, FloorPlan } from "@/hooks/useFloorPlans";
 
-const mockFloors = [
-  { id: "b1", label: "Basement 1", rooms: 8, area: "4,200 sqft", status: "Final" },
-  { id: "g", label: "Ground Floor", rooms: 12, area: "5,800 sqft", status: "Final" },
-  { id: "1", label: "Floor 1", rooms: 14, area: "5,400 sqft", status: "Final" },
-  { id: "2", label: "Floor 2", rooms: 14, area: "5,400 sqft", status: "In Review" },
-  { id: "3", label: "Floor 3", rooms: 14, area: "5,400 sqft", status: "In Review" },
-  { id: "4", label: "Floor 4 – Penthouse", rooms: 6, area: "5,400 sqft", status: "Draft" },
-  { id: "r", label: "Roof Plan", rooms: 0, area: "5,800 sqft", status: "Draft" },
+// Fallback data shown when no DB records exist yet
+const FALLBACK_FLOORS: FloorPlan[] = [
+  { id: "b1", project_id: null, level_name: "Basement 1", level_number: -1, area_sqft: 4200, room_count: 8, status: "Final", layout_json: null, created_at: "", updated_at: "" },
+  { id: "g", project_id: null, level_name: "Ground Floor", level_number: 0, area_sqft: 5800, room_count: 12, status: "Final", layout_json: null, created_at: "", updated_at: "" },
+  { id: "1", project_id: null, level_name: "Floor 1", level_number: 1, area_sqft: 5400, room_count: 14, status: "Final", layout_json: null, created_at: "", updated_at: "" },
+  { id: "2", project_id: null, level_name: "Floor 2", level_number: 2, area_sqft: 5400, room_count: 14, status: "In Review", layout_json: null, created_at: "", updated_at: "" },
+  { id: "4", project_id: null, level_name: "Floor 4 – Penthouse", level_number: 4, area_sqft: 5400, room_count: 6, status: "Draft", layout_json: null, created_at: "", updated_at: "" },
 ];
 
-const mockRooms = [
-  { name: "Living Room", area: "380 sqft", type: "Residential", dimensions: "19' × 20'" },
-  { name: "Kitchen", area: "180 sqft", type: "Residential", dimensions: "12' × 15'" },
-  { name: "Master Bedroom", area: "240 sqft", type: "Residential", dimensions: "15' × 16'" },
-  { name: "Bedroom 2", area: "160 sqft", type: "Residential", dimensions: "10' × 16'" },
-  { name: "Bathroom 1", area: "80 sqft", type: "Residential", dimensions: "8' × 10'" },
-  { name: "Hallway", area: "120 sqft", type: "Circulation", dimensions: "4' × 30'" },
-];
+const statusVariant = (s: string) => s === "Final" ? "default" : "secondary";
 
 export default function FloorPlansPage() {
-  const [selectedFloor, setSelectedFloor] = useState("g");
-  const floor = mockFloors.find((f) => f.id === selectedFloor)!;
   const navigate = useNavigate();
-  const { data: variants } = useFloorPlanVariants();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({ level_name: "", level_number: "0", area_sqft: "", room_count: "0", status: "Draft" as FloorPlan["status"] });
+  const [formError, setFormError] = useState("");
+
+  const { data: dbFloors = [], isLoading } = useFloorPlans();
+  const floors = dbFloors.length > 0 ? dbFloors : FALLBACK_FLOORS;
+  const isDemo = dbFloors.length === 0 && !isLoading;
+
+  const currentId = selectedId ?? floors[0]?.id ?? null;
+  const floor = floors.find((f) => f.id === currentId) ?? floors[0];
+
+  const { data: rooms = [] } = useFloorPlanRooms(dbFloors.length > 0 ? currentId : null);
+  const createFloorPlan = useCreateFloorPlan();
   const updateVariant = useUpdateFloorPlanVariant();
+  const { data: variants } = useFloorPlanVariants();
+
+  const handleCreate = () => {
+    if (!form.level_name.trim()) { setFormError("Level name is required."); return; }
+    setFormError("");
+    createFloorPlan.mutate({
+      project_id: null,
+      level_name: form.level_name.trim(),
+      level_number: parseInt(form.level_number) || 0,
+      area_sqft: form.area_sqft ? parseFloat(form.area_sqft) : null,
+      room_count: parseInt(form.room_count) || 0,
+      status: form.status,
+      layout_json: null,
+    }, {
+      onSuccess: () => {
+        setCreateOpen(false);
+        setForm({ level_name: "", level_number: "0", area_sqft: "", room_count: "0", status: "Draft" });
+      },
+    });
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -41,38 +68,32 @@ export default function FloorPlansPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Floor Plans</h1>
             <Badge variant="outline" className="text-[10px]">Spatial Workbench</Badge>
+            {isDemo && <Badge variant="secondary" className="text-[10px]">Demo</Badge>}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Generate and review parametric floor plans for each level.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)} className="text-xs">
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Level
+          </Button>
           <Button size="sm" variant="outline" onClick={() => navigate("/spatial/generator")} className="text-xs">
             <Wand2 className="h-3.5 w-3.5 mr-1.5" /> Generate with AI
           </Button>
-          <Select value={selectedFloor} onValueChange={setSelectedFloor}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {mockFloors.map((f) => (
-                <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Floor plan canvas */}
-        <Card className="lg:col-span-2">
+        <Card className="md:col-span-1 lg:col-span-2">
           <CardContent className="p-0 relative">
             <div className="aspect-[4/3] bg-muted/20 rounded-lg relative overflow-hidden">
-              {/* Grid */}
               <div className="absolute inset-0" style={{
                 backgroundImage: "linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)",
                 backgroundSize: "24px 24px",
                 opacity: 0.25,
               }} />
-              {/* Mock floor plan */}
+              {/* Static floor plan outline */}
               <div className="absolute inset-8 border-2 border-foreground/20 rounded-sm">
-                {/* Rooms */}
                 <div className="absolute top-0 left-0 w-[45%] h-[55%] border-r border-b border-foreground/15 flex items-center justify-center">
                   <span className="text-[10px] text-muted-foreground">Living Room</span>
                 </div>
@@ -92,19 +113,16 @@ export default function FloorPlansPage() {
                   <span className="text-[10px] text-muted-foreground">Hallway</span>
                 </div>
               </div>
-
               {/* Toolbar */}
               <div className="absolute top-3 right-3 flex flex-col gap-1 z-10">
                 {[ZoomIn, ZoomOut, Maximize2, Grid3X3, Ruler].map((Icon, i) => (
-                  <Button key={i} variant="secondary" size="icon" className="h-7 w-7">
+                  <Button key={i} variant="secondary" size="icon" className="h-7 w-7" aria-label={["Zoom in", "Zoom out", "Fit to screen", "Toggle grid", "Ruler"][i]}>
                     <Icon className="h-3.5 w-3.5" />
                   </Button>
                 ))}
               </div>
-
-              {/* Label */}
               <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur rounded px-2 py-1 text-xs font-medium">
-                {floor.label} — {floor.area}
+                {floor?.level_name} — {floor?.area_sqft ? `${floor.area_sqft.toLocaleString()} sqft` : "Area TBD"}
               </div>
             </div>
           </CardContent>
@@ -115,29 +133,30 @@ export default function FloorPlansPage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Floor Details</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Level</span><span className="font-medium">{floor.label}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Total Area</span><span className="font-medium">{floor.area}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Rooms</span><span className="font-medium">{floor.rooms}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Level</span><span className="font-medium">{floor?.level_name}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total Area</span><span className="font-medium">{floor?.area_sqft ? `${floor.area_sqft.toLocaleString()} sqft` : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Rooms</span><span className="font-medium">{floor?.room_count}</span></div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <Badge variant={floor.status === "Final" ? "default" : "secondary"} className="text-[10px] h-5">{floor.status}</Badge>
+                <Badge variant={statusVariant(floor?.status ?? "")} className="text-[10px] h-5">{floor?.status}</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Floor list */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">All Levels</CardTitle></CardHeader>
-            <CardContent className="space-y-1">
-              {mockFloors.map((f) => (
+            <CardContent className="space-y-1 max-h-64 overflow-y-auto">
+              {isLoading ? (
+                [1,2,3].map(i => <div key={i} className="h-7 rounded bg-muted animate-pulse" />)
+              ) : floors.map((f) => (
                 <button
                   key={f.id}
-                  onClick={() => setSelectedFloor(f.id)}
+                  onClick={() => setSelectedId(f.id)}
                   className={`w-full flex items-center justify-between text-xs py-1.5 px-2 rounded transition-colors ${
-                    f.id === selectedFloor ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/50 text-muted-foreground"
+                    f.id === currentId ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/50 text-muted-foreground"
                   }`}
                 >
-                  <span>{f.label}</span>
+                  <span>{f.level_name}</span>
                   <Badge variant="outline" className="text-[9px] h-4">{f.status}</Badge>
                 </button>
               ))}
@@ -194,30 +213,77 @@ export default function FloorPlansPage() {
 
       {/* Room schedule */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Room Schedule — {floor.label}</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Room Schedule — {floor?.level_name}</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Room</TableHead>
-                <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs">Dimensions</TableHead>
-                <TableHead className="text-xs text-right">Area</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockRooms.map((r) => (
-                <TableRow key={r.name}>
-                  <TableCell className="text-xs font-medium">{r.name}</TableCell>
-                  <TableCell className="text-xs"><Badge variant="outline" className="text-[10px]">{r.type}</Badge></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{r.dimensions}</TableCell>
-                  <TableCell className="text-xs text-right">{r.area}</TableCell>
+          {rooms.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              {dbFloors.length > 0 ? "No rooms added yet for this level." : "Add floor plan levels to see room data."}
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Room</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
+                  <TableHead className="text-xs">Dimensions</TableHead>
+                  <TableHead className="text-xs text-right">Area</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rooms.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-xs font-medium">{r.name}</TableCell>
+                    <TableCell className="text-xs"><Badge variant="outline" className="text-[10px]">{r.room_type}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.dimensions || "—"}</TableCell>
+                    <TableCell className="text-xs text-right">{r.area_sqft ? `${r.area_sqft} sqft` : "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      {/* Create floor plan dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Home className="h-4 w-4" /> Add Floor Level</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Level Name <span className="text-destructive">*</span></Label>
+              <Input value={form.level_name} onChange={(e) => setForm({ ...form, level_name: e.target.value })} placeholder="e.g. Ground Floor" />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Level Number</Label>
+                <Input type="number" value={form.level_number} onChange={(e) => setForm({ ...form, level_number: e.target.value })} placeholder="0" />
+              </div>
+              <div>
+                <Label>Area (sqft)</Label>
+                <Input type="number" value={form.area_sqft} onChange={(e) => setForm({ ...form, area_sqft: e.target.value })} placeholder="Optional" />
+              </div>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as FloorPlan["status"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="In Review">In Review</SelectItem>
+                  <SelectItem value="Final">Final</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={createFloorPlan.isPending}>
+              {createFloorPlan.isPending ? "Creating..." : "Create Level"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

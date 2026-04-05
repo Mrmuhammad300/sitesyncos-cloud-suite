@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bot, Brain, ShieldCheck, DollarSign, FileSearch, Zap, Activity, Cpu } from "lucide-react";
+import { Bot, Brain, ShieldCheck, DollarSign, FileSearch, Zap, Activity, Cpu, Play } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 type Agent = Tables<"ai_agents">;
 
@@ -23,6 +24,17 @@ function agentIcon(agent: Agent): React.ElementType {
     (k) => agent.agent_type?.toLowerCase().includes(k) || agent.name?.toLowerCase().includes(k)
   );
   return key ? TYPE_ICON[key] : Cpu;
+}
+
+// Map agent types to event types understood by the orchestrator
+function agentEventType(agent: Agent): string {
+  const type = (agent.agent_type ?? "").toLowerCase();
+  if (type.includes("risk"))       return "rfi_created";
+  if (type.includes("cost"))       return "change_order_created";
+  if (type.includes("compliance")) return "compliance_check";
+  if (type.includes("schedule"))   return "project_updated";
+  if (type.includes("quality"))    return "submittal_submitted";
+  return "project_updated";
 }
 
 const AUTONOMY_STYLE: Record<string, string> = {
@@ -43,6 +55,8 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function AgentsPage() {
+  const qc = useQueryClient();
+
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["ai_agents"],
     queryFn: async () => {
@@ -63,6 +77,35 @@ export default function AgentsPage() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Toggle agent active/inactive via orchestrator PATCH
+  const toggleAgent = useMutation({
+    mutationFn: async ({ agentId, isActive }: { agentId: string; isActive: boolean }) => {
+      const { error } = await supabase.functions.invoke("agent-orchestrator/toggle-agent", {
+        method: "PATCH",
+        body: { agentId, isActive },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_agents"] }),
+    onError: (e: Error) => toast.error(`Toggle failed: ${e.message}`),
+  });
+
+  // Run a single agent via execute-pipeline
+  const runAgent = useMutation({
+    mutationFn: async (agent: Agent) => {
+      const { data, error } = await supabase.functions.invoke("agent-orchestrator/execute-pipeline", {
+        body: { eventType: agentEventType(agent), context: { triggered_by: "manual", agent_id: agent.agent_id } },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, agent) => {
+      toast.success(`Agent "${agent.name}" executed`);
+      qc.invalidateQueries({ queryKey: ["agent_executions"] });
+    },
+    onError: (e: Error) => toast.error(`Execution failed: ${e.message}`),
   });
 
   // Build last-run map: agent_id → most recent created_at
@@ -88,7 +131,19 @@ export default function AgentsPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Multi-agent orchestration for risk, cost, and compliance</p>
         </div>
-        <Button size="sm" variant="outline"><Bot className="h-4 w-4 mr-1" />Deploy Agent</Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const active = agents.filter((a) => a.is_active);
+            if (!active.length) { toast.info("No active agents to run"); return; }
+            active.forEach((a) => runAgent.mutate(a));
+          }}
+          disabled={runAgent.isPending}
+        >
+          <Bot className="h-4 w-4 mr-1" />
+          {runAgent.isPending ? "Running…" : "Run All Active"}
+        </Button>
       </div>
 
       {isLoading ? (
@@ -118,6 +173,7 @@ export default function AgentsPage() {
           {agents.map((a) => {
             const Icon = agentIcon(a);
             const lastRun = lastRunMap[a.agent_id];
+            const isRunning = runAgent.isPending && runAgent.variables?.agent_id === a.agent_id;
             return (
               <Card key={a.id} className="group hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
@@ -126,7 +182,13 @@ export default function AgentsPage() {
                       <Icon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch checked={a.is_active} disabled className="scale-75" />
+                      <Switch
+                        checked={a.is_active}
+                        disabled={toggleAgent.isPending}
+                        aria-label={`${a.is_active ? "Deactivate" : "Activate"} ${a.name}`}
+                        onCheckedChange={(v) => toggleAgent.mutate({ agentId: a.agent_id, isActive: v })}
+                        className="scale-75"
+                      />
                       <Badge
                         className={a.is_active
                           ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
@@ -150,7 +212,20 @@ export default function AgentsPage() {
                     <span className="text-xs text-muted-foreground">
                       Last run: {lastRun ? timeAgo(lastRun) : "never"}
                     </span>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs">Configure</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      disabled={!a.is_active || runAgent.isPending}
+                      aria-label={`Run ${a.name}`}
+                      onClick={() => runAgent.mutate(a)}
+                    >
+                      {isRunning ? (
+                        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full border border-primary border-t-transparent animate-spin" />Running</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><Play className="h-3 w-3" />Run</span>
+                      )}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

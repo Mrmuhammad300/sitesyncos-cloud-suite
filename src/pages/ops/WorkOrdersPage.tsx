@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, Wrench, Clock, CheckCircle2, AlertTriangle, Trash2, Download } from "lucide-react";
-import { useWorkOrders, useCreateWorkOrder, useDeleteWorkOrder } from "@/hooks/useOpsData";
+import { useWorkOrders, useCreateWorkOrder, useDeleteWorkOrder, useUpdateWorkOrder } from "@/hooks/useOpsData";
 import { Tables } from "@/integrations/supabase/types";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
@@ -41,9 +41,11 @@ const WorkOrdersPage = () => {
   const [detail, setDetail] = useState<WorkOrder | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", property_name: "", unit: "", due_date: "" });
+  const [formError, setFormError] = useState("");
   const filters = ["All", "Open", "In Progress", "Completed", "On Hold", "Cancelled"];
   const { data: wos = [], isLoading } = useWorkOrders();
   const createWO = useCreateWorkOrder();
+  const updateWO = useUpdateWorkOrder();
   const deleteWO = useDeleteWorkOrder();
 
   const filtered = wos.filter(
@@ -63,7 +65,8 @@ const WorkOrdersPage = () => {
   ];
 
   const handleCreate = () => {
-    if (!form.title) return;
+    if (!form.title.trim()) { setFormError("Title is required."); return; }
+    setFormError("");
     const woNum = `WO-${String(wos.length + 1).padStart(3, "0")}`;
     createWO.mutate({
       wo_number: woNum,
@@ -181,7 +184,25 @@ const WorkOrdersPage = () => {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><span className="font-mono text-sm text-muted-foreground">{detail?.wo_number}</span>{detail?.title}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="flex gap-2"><Badge className={statusConfig[detail?.status || ""]}>{detail?.status}</Badge><Badge className={priorityColor[detail?.priority || ""]}>{detail?.priority}</Badge></div>
+            <div className="flex gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Status</Label>
+                <Select
+                  value={detail?.status ?? "Open"}
+                  onValueChange={(v) => {
+                    if (!detail) return;
+                    updateWO.mutate({ id: detail.id, status: v });
+                    setDetail({ ...detail, status: v });
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(statusConfig).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Badge className={priorityColor[detail?.priority || ""]}>{detail?.priority}</Badge>
+            </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div><span className="text-muted-foreground">Category:</span> {detail?.category || "—"}</div>
               <div><span className="text-muted-foreground">Assigned To:</span> {detail?.assigned_to || "—"}</div>
@@ -195,11 +216,15 @@ const WorkOrdersPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(v) => { setCreateOpen(v); if (!v) setFormError(""); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Work Order</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Work order title" /></div>
+            <div>
+              <Label>Title <span className="text-destructive">*</span></Label>
+              <Input value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(""); }} placeholder="Work order title" className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe the issue..." rows={3} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Priority</Label>

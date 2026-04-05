@@ -34,6 +34,7 @@ const DrawRequestsPage = () => {
   const [detail, setDetail] = useState<DrawRequest | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", amount: "", description: "", requested_by: "" });
+  const [formError, setFormError] = useState("");
   const filters = ["All", "Draft", "Submitted", "Under Review", "Approved", "Rejected", "Paid"];
   const { data: draws = [], isLoading } = useDrawRequests();
   const createDraw = useCreateDrawRequest();
@@ -59,7 +60,8 @@ const DrawRequestsPage = () => {
   ];
 
   const handleCreate = () => {
-    if (!form.title) return;
+    if (!form.title.trim()) { setFormError("Title is required."); return; }
+    setFormError("");
     const drawNum = `DRAW-${String(draws.length + 1).padStart(3, "0")}`;
     createDraw.mutate({
       draw_number: drawNum,
@@ -171,11 +173,15 @@ const DrawRequestsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(v) => { setCreateOpen(v); if (!v) setFormError(""); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Create Draw Request</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Draw request title" /></div>
+            <div>
+              <Label>Title <span className="text-destructive">*</span></Label>
+              <Input value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(""); }} placeholder="Draw request title" className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe the draw request..." rows={3} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Amount ($)</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" /></div>

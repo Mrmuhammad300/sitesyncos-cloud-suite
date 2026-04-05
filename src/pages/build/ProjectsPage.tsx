@@ -46,6 +46,7 @@ export default function ProjectsPage() {
     name: "", location: "", project_manager: "", status: "On Track",
     budget: "", start_date: "", end_date: "",
   });
+  const [formError, setFormError] = useState("");
 
   const filtered = projects.filter(p => {
     const ms = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,9 +71,10 @@ export default function ProjectsPage() {
     : 0;
 
   const handleSubmit = () => {
-    if (!form.name) return;
+    if (!form.name.trim()) { setFormError("Project name is required."); return; }
+    setFormError("");
     createProject.mutate({
-      name: form.name,
+      name: form.name.trim(),
       location: form.location || null,
       project_manager: form.project_manager || null,
       status: form.status,
@@ -276,11 +278,15 @@ export default function ProjectsPage() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFormError(""); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Name *</Label>
+              <Input value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setFormError(""); }} className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label className="text-xs">Location</Label><Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Project Manager</Label><Input value={form.project_manager} onChange={e => setForm(f => ({ ...f, project_manager: e.target.value }))} /></div>
