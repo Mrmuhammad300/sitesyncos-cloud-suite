@@ -60,10 +60,10 @@ export default function TreasuryPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Debits</p><p className="text-xl font-bold">{fmt(totalDebit)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Credits</p><p className="text-xl font-bold text-success">{fmt(totalCredit)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pending Approvals</p><p className="text-xl font-bold text-warning">{pendingCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Net Position</p><p className={`text-xl font-bold ${totalCredit - totalDebit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(Math.abs(totalCredit - totalDebit))}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Debits</p><p className="ss-stat-value">{fmt(totalDebit)}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Credits</p><p className="ss-stat-value text-success">{fmt(totalCredit)}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Pending Approvals</p><p className="ss-stat-value text-warning">{pendingCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Net Position</p><p className={`ss-stat-value ${totalCredit - totalDebit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(Math.abs(totalCredit - totalDebit))}</p></CardContent></Card>
       </div>
 
       <Tabs defaultValue="ledger">

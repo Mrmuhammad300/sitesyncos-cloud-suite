@@ -117,21 +117,21 @@ export default function AIAssistantPage() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-4">
-          <p className="text-xs text-muted-foreground">Active Agents</p>
-          <p className="text-2xl font-bold">{activeCount}<span className="text-sm font-normal text-muted-foreground">/{agents?.length ?? 0}</span></p>
+        <Card className="ss-stat-card"><CardContent className="p-0">
+          <p className="ss-stat-label">Active Agents</p>
+          <p className="ss-stat-value">{activeCount}<span className="text-sm font-normal text-muted-foreground">/{agents?.length ?? 0}</span></p>
         </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <p className="text-xs text-muted-foreground">Executions</p>
-          <p className="text-2xl font-bold">{completedCount}</p>
+        <Card className="ss-stat-card"><CardContent className="p-0">
+          <p className="ss-stat-label">Executions</p>
+          <p className="ss-stat-value">{completedCount}</p>
         </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <p className="text-xs text-muted-foreground">Avg Confidence</p>
-          <p className="text-2xl font-bold">{avgConfidence}%</p>
+        <Card className="ss-stat-card"><CardContent className="p-0">
+          <p className="ss-stat-label">Avg Confidence</p>
+          <p className="ss-stat-value">{avgConfidence}%</p>
         </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <p className="text-xs text-muted-foreground">Pending Approvals</p>
-          <p className="text-2xl font-bold text-amber-500">{pendingApprovals.length}</p>
+        <Card className="ss-stat-card"><CardContent className="p-0">
+          <p className="ss-stat-label">Pending Approvals</p>
+          <p className="ss-stat-value text-amber-500">{pendingApprovals.length}</p>
         </CardContent></Card>
       </div>
 
