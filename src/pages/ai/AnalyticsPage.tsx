@@ -95,17 +95,17 @@ export default function AnalyticsPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Activity className="h-3.5 w-3.5" />Avg Progress</div>
-            <p className="text-2xl font-bold">{avgProgress}%</p>
-            <p className="text-xs text-muted-foreground">Across all projects</p>
+            <p className="ss-stat-value">{avgProgress}%</p>
+            <p className="ss-stat-label">Across all projects</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Target className="h-3.5 w-3.5" />On-Time Rate</div>
-            <p className="text-2xl font-bold">{onTimeRate}%</p>
+            <p className="ss-stat-value">{onTimeRate}%</p>
             <p className={`text-xs ${onTimeRate >= 80 ? "text-success" : "text-warning"}`}>
               {onTimeRate >= 80 ? "Above target" : "Below target"}
             </p>
