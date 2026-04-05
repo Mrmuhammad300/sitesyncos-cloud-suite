@@ -74,9 +74,9 @@ export default function PropertiesPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Portfolio Value</p><p className="text-xl font-bold">{fmt(totalValue)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Properties</p><p className="text-xl font-bold">{properties.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Cap Rate</p><p className="text-xl font-bold">{avgCap.toFixed(1)}%</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Portfolio Value</p><p className="ss-stat-value">{fmt(totalValue)}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Properties</p><p className="ss-stat-value">{properties.length}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Avg Cap Rate</p><p className="ss-stat-value">{avgCap.toFixed(1)}%</p></CardContent></Card>
         <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Avg Occupancy</p><p className="ss-stat-value">{avgOcc.toFixed(1)}%</p></CardContent></Card>
       </div>
 
