@@ -15,6 +15,7 @@ import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { exportToCSV, printToPDF } from "@/lib/export";
+import { fmtDollar } from "@/lib/utils";
 
 type DrawRequest = Tables<"draw_requests">;
 
@@ -53,8 +54,8 @@ const DrawRequestsPage = () => {
 
   const kpis = [
     { label: "Total Draws", value: draws.length, icon: <CreditCard className="h-5 w-5 text-primary" /> },
-    { label: "Total Requested", value: `$${(totalRequested / 1e6).toFixed(1)}M`, icon: <DollarSign className="h-5 w-5 text-accent" /> },
-    { label: "Approved/Paid", value: `$${(totalApproved / 1e6).toFixed(1)}M`, icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
+    { label: "Total Requested", value: fmtDollar(totalRequested), icon: <DollarSign className="h-5 w-5 text-accent" /> },
+    { label: "Approved/Paid", value: fmtDollar(totalApproved), icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
     { label: "Pending", value: draws.filter(d => ["Submitted", "Under Review"].includes(d.status)).length, icon: <Clock className="h-5 w-5 text-warning" /> },
   ];
 

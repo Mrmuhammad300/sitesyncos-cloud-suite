@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { fmtDollar } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -55,7 +56,7 @@ const statusBadgeClass: Record<string, string> = {
   "Complete": "badge-active",
 };
 
-const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${v.toLocaleString()}`;
+const fmt = fmtDollar;
 
 export default function Dashboard() {
   const { data: projects = [], isLoading: projectsLoading } = useProjects();

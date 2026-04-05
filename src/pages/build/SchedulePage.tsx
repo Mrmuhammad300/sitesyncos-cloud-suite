@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from "react";
+import { fmtDollar } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -238,7 +239,7 @@ function GanttChart({ projects }: GanttProps) {
                               <p>{formatDate(proj.start_date, { month: "short", day: "numeric" })} → {formatDate(proj.end_date, { month: "short", day: "numeric", year: "numeric" })}</p>
                               <p>Progress: {proj.progress}% · Status: {proj.status}</p>
                               {proj.project_manager && <p>PM: {proj.project_manager}</p>}
-                              <p>Budget: ${(proj.budget / 1e6).toFixed(1)}M · Spent: ${(proj.spent / 1e6).toFixed(1)}M</p>
+                              <p>Budget: {fmtDollar(proj.budget)} · Spent: {fmtDollar(proj.spent)}</p>
                             </div>
                           </div>
                         </TooltipContent>
@@ -287,7 +288,7 @@ function GanttChart({ projects }: GanttProps) {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div><p className="text-muted-foreground">Duration</p><p className="font-medium">{formatDate(proj.start_date, { month: "short", day: "numeric" })} — {formatDate(proj.end_date, { month: "short", day: "numeric" })}</p></div>
                     <div><p className="text-muted-foreground">Progress</p><p className="font-medium">{proj.progress}%</p></div>
-                    <div><p className="text-muted-foreground">Budget</p><p className="font-medium">${(proj.budget / 1e6).toFixed(1)}M</p></div>
+                    <div><p className="text-muted-foreground">Budget</p><p className="font-medium">{fmtDollar(proj.budget)}</p></div>
                     <div><p className="text-muted-foreground">Team</p><p className="font-medium">{proj.team_size} members</p></div>
                   </div>
                 </div>

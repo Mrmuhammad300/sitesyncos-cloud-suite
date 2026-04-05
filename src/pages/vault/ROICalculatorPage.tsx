@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Percent, TrendingUp, DollarSign, ArrowUpRight, Building2 } from "lucide-react";
 import { useProperties } from "@/hooks/useVaultData";
+import { fmtDollar } from "@/lib/utils";
 
 export default function ROICalculatorPage() {
   const { data: properties, isLoading } = useProperties();
@@ -63,7 +64,7 @@ export default function ROICalculatorPage() {
   }
   const irr = (((lo + hi) / 2) * 100).toFixed(1);
 
-  const fmt = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${(n / 1e3).toFixed(0)}K`);
+  const fmt = fmtDollar;
 
   return (
     <div className="space-y-6 animate-fade-in">

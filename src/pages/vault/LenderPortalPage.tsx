@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtDollar } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export default function LenderPortalPage() {
   const totalDrawn = lenders.reduce((s, l) => s + Number(l.drawn), 0);
   const avgCompliance = lenders.length ? Math.round(lenders.reduce((s, l) => s + (l.compliance_score || 0), 0) / lenders.length) : 0;
 
-  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+  const fmt = fmtDollar;
 
   const handleSubmit = () => {
     create.mutate({

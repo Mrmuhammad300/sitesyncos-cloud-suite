@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtDollar } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ const statusColor: Record<string, string> = {
 
 const STATUSES = ["On Track", "At Risk", "Behind", "Complete"] as const;
 
-const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+const fmt = fmtDollar;
 
 export default function ProjectsPage() {
   const { data: projects = [], isLoading } = useProjects();

@@ -11,6 +11,7 @@ import { Plus, Search, MapPin, Eye, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import { useProperties, useCreateProperty, useUpdateProperty } from "@/hooks/useVaultData";
 import type { Database } from "@/integrations/supabase/types";
+import { fmtDollar } from "@/lib/utils";
 
 type Property = Database["public"]["Tables"]["properties"]["Row"];
 
@@ -58,7 +59,7 @@ export default function PropertiesPage() {
     setForm({ name: "", address: "", property_type: "Office", status: "Active", price: "", sqft: "", cap_rate: "", noi: "", irr: "", year_built: "", units: "", occupancy: "" });
   };
 
-  const fmt = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toLocaleString()}`;
+  const fmt = fmtDollar;
 
   return (
     <div className="space-y-6 animate-fade-in">
