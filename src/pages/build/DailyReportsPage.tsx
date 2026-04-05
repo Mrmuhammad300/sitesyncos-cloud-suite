@@ -136,28 +136,28 @@ export default function DailyReportsPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0 flex items-center gap-3">
             <Clock className="h-5 w-5 text-primary" />
-            <div><p className="text-xs text-muted-foreground">Total Reports</p><p className="text-xl font-bold">{reports.length}</p></div>
+            <div><p className="ss-stat-label">Total Reports</p><p className="ss-stat-value">{reports.length}</p></div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0 flex items-center gap-3">
             <Users className="h-5 w-5 text-success" />
-            <div><p className="text-xs text-muted-foreground">Avg Crew / Day</p><p className="text-xl font-bold">{avgCrew}</p></div>
+            <div><p className="ss-stat-label">Avg Crew / Day</p><p className="ss-stat-value">{avgCrew}</p></div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0 flex items-center gap-3">
             <CloudSun className="h-5 w-5 text-accent" />
-            <div><p className="text-xs text-muted-foreground">Total Work Hours</p><p className="text-xl font-bold">{totalWorkHours.toLocaleString()}</p></div>
+            <div><p className="ss-stat-label">Total Work Hours</p><p className="ss-stat-value">{totalWorkHours.toLocaleString()}</p></div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
+        <Card className="ss-stat-card">
+          <CardContent className="p-0 flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <div><p className="text-xs text-muted-foreground">Safety Incidents</p><p className="text-xl font-bold">{totalSafetyIncidents}</p></div>
+            <div><p className="ss-stat-label">Safety Incidents</p><p className="ss-stat-value">{totalSafetyIncidents}</p></div>
           </CardContent>
         </Card>
       </div>

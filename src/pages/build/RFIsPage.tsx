@@ -133,10 +133,10 @@ export default function RFIsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-bold">{rfis.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Open</p><p className="text-xl font-bold text-primary">{openCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">In Review</p><p className="text-xl font-bold text-warning">{inReviewCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Answered</p><p className="text-xl font-bold text-success">{answeredCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total</p><p className="ss-stat-value">{rfis.length}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Open</p><p className="ss-stat-value text-primary">{openCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">In Review</p><p className="ss-stat-value text-warning">{inReviewCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Answered</p><p className="ss-stat-value text-success">{answeredCount}</p></CardContent></Card>
       </div>
 
       {/* Filters */}
@@ -193,7 +193,7 @@ export default function RFIsPage() {
       </div>
 
       {/* Table — hidden on small screens */}
-      <Card className="hidden sm:block">
+      <Card className="hidden sm:block ss-card-glow">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>

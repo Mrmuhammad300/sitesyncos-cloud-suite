@@ -134,17 +134,17 @@ export default function ChangeOrdersPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total COs</p><p className="text-xl font-bold">{changeOrders.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Value</p><p className="text-xl font-bold">{fmt(totalValue)}</p></CardContent></Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Approved Value</p>
-            <p className="text-xl font-bold text-success flex items-center gap-1">
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total COs</p><p className="ss-stat-value">{changeOrders.length}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Value</p><p className="ss-stat-value">{fmt(totalValue)}</p></CardContent></Card>
+        <Card className="ss-stat-card">
+          <CardContent className="p-0">
+            <p className="ss-stat-label">Approved Value</p>
+            <p className="ss-stat-value text-success flex items-center gap-1">
               <ArrowUpRight className="h-4 w-4" />{fmt(approvedValue)}
             </p>
           </CardContent>
         </Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pending</p><p className="text-xl font-bold text-warning">{pendingCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Pending</p><p className="ss-stat-value text-warning">{pendingCount}</p></CardContent></Card>
       </div>
 
       {/* Filters */}
