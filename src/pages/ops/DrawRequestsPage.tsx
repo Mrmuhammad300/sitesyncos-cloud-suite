@@ -15,6 +15,7 @@ import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { exportToCSV, printToPDF } from "@/lib/export";
+import { fmtDollar } from "@/lib/utils";
 
 type DrawRequest = Tables<"draw_requests">;
 
