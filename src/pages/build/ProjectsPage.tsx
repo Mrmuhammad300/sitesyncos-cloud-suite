@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MapPin, Trash2, Download } from "lucide-react";
+import { Plus, Search, MapPin, Trash2, Download, Pencil } from "lucide-react";
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
