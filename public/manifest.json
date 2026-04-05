@@ -1,0 +1,19 @@
+{
+  "name": "SiteSync Cloud Suite",
+  "short_name": "SiteSync",
+  "description": "Construction and real estate portfolio management platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "screenshots": []
+}

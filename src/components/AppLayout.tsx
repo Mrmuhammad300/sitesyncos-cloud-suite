@@ -18,7 +18,8 @@ function getStoredDark(): boolean {
     const raw = localStorage.getItem(APPEARANCE_KEY);
     if (raw) return (JSON.parse(raw) as { darkMode?: boolean }).darkMode ?? false;
   } catch {}
-  return document.documentElement.classList.contains("dark");
+  // Fall back to OS preference when no stored value exists
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

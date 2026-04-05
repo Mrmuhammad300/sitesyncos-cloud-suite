@@ -180,8 +180,8 @@ export default function ViewerPage() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <Card className="lg:col-span-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="md:col-span-2 lg:col-span-3">
           <CardContent className="p-0">
             <div className="aspect-[16/9] rounded-lg overflow-hidden bg-muted/20">
               <Canvas shadows>
@@ -212,7 +212,7 @@ export default function ViewerPage() {
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Layers</CardTitle></CardHeader>
             <CardContent className="space-y-1.5">
               {layers.map((layer, i) => (
-                <button key={layer.name} onClick={() => toggleLayer(i)} className="flex items-center justify-between w-full text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors">
+                <button key={layer.name} onClick={() => toggleLayer(i)} aria-label={`${layer.visible ? "Hide" : "Show"} ${layer.name}`} className="flex items-center justify-between w-full text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: layer.color, opacity: layer.visible ? 1 : 0.3 }} />
                     <span className={layer.visible ? "" : "text-muted-foreground line-through"}>{layer.name}</span>

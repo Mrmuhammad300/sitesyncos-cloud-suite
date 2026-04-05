@@ -54,6 +54,7 @@ export default function PunchListPage() {
     title: "", description: "", priority: "Medium", assigned_to: "",
     property_name: "", unit: "", due_date: "",
   });
+  const [formError, setFormError] = useState("");
 
   // Only Punch List items
   const punchItems = allWorkOrders.filter(w => w.category === "Punch List");
@@ -81,7 +82,8 @@ export default function PunchListPage() {
     : 0;
 
   const handleSubmit = () => {
-    if (!form.title) return;
+    if (!form.title.trim()) { setFormError("Title is required."); return; }
+    setFormError("");
     const woNum = `PL-${String(allWorkOrders.length + 1).padStart(3, "0")}`;
     createWO.mutate({
       wo_number: woNum,
@@ -359,11 +361,15 @@ export default function PunchListPage() {
       </Dialog>
 
       {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFormError(""); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Punch List Item</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Deficiency description" /></div>
+            <div>
+              <Label className="text-xs">Title *</Label>
+              <Input value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormError(""); }} placeholder="Deficiency description" className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label className="text-xs">Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div>
