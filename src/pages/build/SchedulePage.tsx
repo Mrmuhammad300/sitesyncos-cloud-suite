@@ -239,7 +239,7 @@ function GanttChart({ projects }: GanttProps) {
                               <p>{formatDate(proj.start_date, { month: "short", day: "numeric" })} → {formatDate(proj.end_date, { month: "short", day: "numeric", year: "numeric" })}</p>
                               <p>Progress: {proj.progress}% · Status: {proj.status}</p>
                               {proj.project_manager && <p>PM: {proj.project_manager}</p>}
-                              <p>Budget: ${(proj.budget / 1e6).toFixed(1)}M · Spent: ${(proj.spent / 1e6).toFixed(1)}M</p>
+                              <p>Budget: {fmtDollar(proj.budget)} · Spent: {fmtDollar(proj.spent)}</p>
                             </div>
                           </div>
                         </TooltipContent>
