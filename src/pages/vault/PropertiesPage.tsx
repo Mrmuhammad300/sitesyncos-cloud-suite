@@ -11,6 +11,7 @@ import { Plus, Search, MapPin, Eye, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import { useProperties, useCreateProperty, useUpdateProperty } from "@/hooks/useVaultData";
 import type { Database } from "@/integrations/supabase/types";
+import { fmtDollar } from "@/lib/utils";
 
 type Property = Database["public"]["Tables"]["properties"]["Row"];
 

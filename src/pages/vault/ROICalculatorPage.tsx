@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Percent, TrendingUp, DollarSign, ArrowUpRight, Building2 } from "lucide-react";
 import { useProperties } from "@/hooks/useVaultData";
+import { fmtDollar } from "@/lib/utils";
 
 export default function ROICalculatorPage() {
   const { data: properties, isLoading } = useProperties();

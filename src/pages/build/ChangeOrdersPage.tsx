@@ -16,6 +16,7 @@ import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { exportToCSV, printToPDF } from "@/lib/export";
+import { fmtDollar } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChangeOrder = Database["public"]["Tables"]["change_orders"]["Row"];
