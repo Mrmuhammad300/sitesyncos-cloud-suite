@@ -115,10 +115,10 @@ export default function ProjectsPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Projects</p><p className="text-xl font-bold">{projects.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active</p><p className="text-xl font-bold text-primary">{activeCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Budget</p><p className="text-xl font-bold">{fmt(totalBudget)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Progress</p><p className="text-xl font-bold">{avgProgress}%</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Projects</p><p className="ss-stat-value">{projects.length}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Active</p><p className="ss-stat-value text-primary">{activeCount}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Budget</p><p className="ss-stat-value">{fmt(totalBudget)}</p></CardContent></Card>
+        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Avg Progress</p><p className="ss-stat-value">{avgProgress}%</p></CardContent></Card>
       </div>
 
       {/* Spend bar */}
