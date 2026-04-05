@@ -140,12 +140,12 @@ const DocumentsPage = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpis.map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-4 flex items-center gap-3">
+          <Card key={k.label} className="ss-stat-card">
+            <CardContent className="p-0 flex items-center gap-3">
               {k.icon}
               <div>
-                <p className="text-2xl font-bold">{k.value}</p>
-                <p className="text-xs text-muted-foreground">{k.label}</p>
+                <p className="ss-stat-value">{k.value}</p>
+                <p className="ss-stat-label">{k.label}</p>
               </div>
             </CardContent>
           </Card>
