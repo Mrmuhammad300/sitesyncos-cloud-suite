@@ -42,11 +42,32 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "", location: "", project_manager: "", status: "On Track",
-    budget: "", start_date: "", end_date: "",
-  });
+
+  const emptyForm = { name: "", location: "", project_manager: "", status: "On Track", budget: "", start_date: "", end_date: "", progress: "" };
+  const [form, setForm] = useState(emptyForm);
+
+  const openEdit = (p: Project) => {
+    setEditingProject(p);
+    setForm({
+      name: p.name,
+      location: p.location ?? "",
+      project_manager: p.project_manager ?? "",
+      status: p.status,
+      budget: String(p.budget),
+      start_date: p.start_date ?? "",
+      end_date: p.end_date ?? "",
+      progress: String(p.progress),
+    });
+    setOpen(true);
+  };
+
+  const openCreate = () => {
+    setEditingProject(null);
+    setForm(emptyForm);
+    setOpen(true);
+  };
 
   const filtered = projects.filter(p => {
     const ms = p.name.toLowerCase().includes(search.toLowerCase()) ||
