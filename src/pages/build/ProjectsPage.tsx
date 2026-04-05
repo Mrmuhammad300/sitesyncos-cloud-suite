@@ -93,7 +93,7 @@ export default function ProjectsPage() {
 
   const handleSubmit = () => {
     if (!form.name) return;
-    createProject.mutate({
+    const payload = {
       name: form.name,
       location: form.location || null,
       project_manager: form.project_manager || null,
@@ -101,9 +101,16 @@ export default function ProjectsPage() {
       budget: Number(form.budget) || 0,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-    });
+      progress: Number(form.progress) || 0,
+    };
+    if (editingProject) {
+      updateProject.mutate({ id: editingProject.id, ...payload });
+    } else {
+      createProject.mutate(payload);
+    }
     setOpen(false);
-    setForm({ name: "", location: "", project_manager: "", status: "On Track", budget: "", start_date: "", end_date: "" });
+    setEditingProject(null);
+    setForm(emptyForm);
   };
 
   const handleBulkStatusUpdate = (status: string) => {
