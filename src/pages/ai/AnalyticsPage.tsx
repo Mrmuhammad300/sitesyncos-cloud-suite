@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { TrendingUp, TrendingDown, Activity, Target } from "lucide-react";
 import { useProjects } from "@/hooks/useProjectData";
 import { useRFIs } from "@/hooks/useProjectData";
@@ -27,44 +28,56 @@ export default function AnalyticsPage() {
   const { data: changeOrders = [] } = useChangeOrders();
   const { data: budgets = [] } = useBudgets();
 
-  // KPI calculations
-  const totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
-  const totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
-  const budgetEfficiency = totalBudget > 0 ? ((1 - (totalSpent / totalBudget)) * 100 + 90).toFixed(1) : "—";
-  const openRFIs = rfis.filter(r => r.status === "Open" || r.status === "In Review").length;
-  const criticalRFIs = rfis.filter(r => r.priority === "High" && r.status !== "Closed").length;
-  const avgProgress = projects.length
-    ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
-    : 0;
-  const onTrackCount = projects.filter(p => p.status === "On Track" || p.status === "Complete").length;
-  const onTimeRate = projects.length ? Math.round((onTrackCount / projects.length) * 100) : 0;
+  // KPI calculations — memoized to avoid recomputing on every render
+  const { budgetEfficiency, openRFIs, criticalRFIs, avgProgress, onTimeRate } =
+    useMemo(() => {
+      const _totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
+      const _totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
+      const budgetEfficiency = _totalBudget > 0 ? ((1 - (_totalSpent / _totalBudget)) * 100 + 90).toFixed(1) : "—";
+      const openRFIs = rfis.filter(r => r.status === "Open" || r.status === "In Review").length;
+      const criticalRFIs = rfis.filter(r => r.priority === "High" && r.status !== "Closed").length;
+      const avgProgress = projects.length
+        ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
+        : 0;
+      const onTrackCount = projects.filter(p => p.status === "On Track" || p.status === "Complete").length;
+      const onTimeRate = projects.length ? Math.round((onTrackCount / projects.length) * 100) : 0;
+      return { totalBudget, totalSpent, budgetEfficiency, openRFIs, criticalRFIs, avgProgress, onTimeRate };
+    }, [projects, rfis]);
 
   // Project status breakdown for pie chart
-  const statusCounts = ["On Track", "At Risk", "Behind", "Complete"].map(status => ({
-    name: status,
-    value: projects.filter(p => p.status === status).length,
-    color: STATUS_COLORS[status],
-  })).filter(d => d.value > 0);
+  const statusCounts = useMemo(() =>
+    ["On Track", "At Risk", "Behind", "Complete"].map(status => ({
+      name: status,
+      value: projects.filter(p => p.status === status).length,
+      color: STATUS_COLORS[status],
+    })).filter(d => d.value > 0),
+  [projects]);
 
   // Budget vs Actual per project (top 6)
-  const budgetData = projects.slice(0, 6).map(p => ({
-    name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name,
-    budget: Math.round(Number(p.budget) / 1000),
-    actual: Math.round(Number(p.spent) / 1000),
-  }));
+  const budgetData = useMemo(() =>
+    projects.slice(0, 6).map(p => ({
+      name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name,
+      budget: Math.round(Number(p.budget) / 1000),
+      actual: Math.round(Number(p.spent) / 1000),
+    })),
+  [projects]);
 
   // Change order value by status
-  const coByStatus = ["Pending", "Under Review", "Approved", "Rejected"].map(status => ({
-    name: status,
-    value: Math.round(changeOrders.filter(co => co.status === status).reduce((s, co) => s + Number(co.amount), 0) / 1000),
-  })).filter(d => d.value > 0);
+  const coByStatus = useMemo(() =>
+    ["Pending", "Under Review", "Approved", "Rejected"].map(status => ({
+      name: status,
+      value: Math.round(changeOrders.filter(co => co.status === status).reduce((s, co) => s + Number(co.amount), 0) / 1000),
+    })).filter(d => d.value > 0),
+  [changeOrders]);
 
   // Budget utilization by category (top 6)
-  const budgetCategoryData = budgets.slice(0, 6).map(b => ({
-    name: b.category.length > 14 ? b.category.slice(0, 14) + "…" : b.category,
-    budget: Math.round(Number(b.allocated) / 1000),
-    actual: Math.round(Number(b.spent) / 1000),
-  }));
+  const budgetCategoryData = useMemo(() =>
+    budgets.slice(0, 6).map(b => ({
+      name: b.category.length > 14 ? b.category.slice(0, 14) + "…" : b.category,
+      budget: Math.round(Number(b.allocated) / 1000),
+      actual: Math.round(Number(b.spent) / 1000),
+    })),
+  [budgets]);
 
   return (
     <div className="space-y-6 animate-fade-in">

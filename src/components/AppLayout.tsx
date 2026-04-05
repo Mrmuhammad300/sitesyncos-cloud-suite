@@ -88,17 +88,30 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
+      {/* Skip to main content — keyboard / screen-reader navigation */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded focus:bg-primary focus:text-primary-foreground focus:text-sm focus:font-medium"
+      >
+        Skip to content
+      </a>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-2 border-b bg-card px-4 shrink-0">
-            <SidebarTrigger className="text-muted-foreground" />
+            <SidebarTrigger className="text-muted-foreground" aria-label="Toggle sidebar" />
             <Separator orientation="vertical" className="h-5 mx-1" />
             <div className="flex-1 max-w-md">
               <GlobalSearch />
             </div>
             <div className="ml-auto flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="text-muted-foreground h-9 w-9" onClick={toggleTheme}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground h-9 w-9"
+                onClick={toggleTheme}
+                aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              >
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
               {isOffline && (
@@ -112,6 +125,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 size="icon"
                 className="text-muted-foreground h-9 w-9 relative"
                 onClick={() => { navigate("/notifications"); clearUnread(); }}
+                aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : "Notifications"}
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
@@ -141,7 +155,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownMenu>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6 bg-background">
+          <main id="main-content" className="flex-1 overflow-auto p-6 bg-background">
             {children}
           </main>
         </div>

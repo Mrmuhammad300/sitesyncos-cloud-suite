@@ -62,11 +62,20 @@ const queryClient = new QueryClient({
   },
 });
 
-// Persist query cache to localStorage for offline reads
+// Persist query cache to localStorage for offline reads (capped at 2MB)
+const MAX_CACHE_BYTES = 2 * 1024 * 1024;
 const persister = createSyncStoragePersister({
   storage: window.localStorage,
   key: "sitesyncos-query-cache",
   throttleTime: 1000,
+  serialize: (data) => {
+    const json = JSON.stringify(data);
+    if (json.length > MAX_CACHE_BYTES) {
+      console.warn("[QueryPersister] Cache exceeds 2 MB, skipping persist.");
+      return JSON.stringify({ clientState: { queries: [], mutations: [] } });
+    }
+    return json;
+  },
 });
 
 const Loading = () => (

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -28,60 +29,69 @@ export default function CostDashboardPage() {
   const { data: changeOrders = [] } = useChangeOrders();
 
   // ── Top-level KPIs ──────────────────────────────────────────────────────────
-  const totalAllocated = budgets.reduce((s, b) => s + Number(b.allocated), 0);
-  const totalSpent = budgets.reduce((s, b) => s + Number(b.spent), 0);
-  const totalRemaining = totalAllocated - totalSpent;
-  const overallPct = pct(totalSpent, totalAllocated);
-
-  // Approved CO value adds to effective budget
-  const approvedCOValue = changeOrders
-    .filter(co => co.status === "Approved")
-    .reduce((s, co) => s + Number(co.amount), 0);
-  const pendingCOValue = changeOrders
-    .filter(co => ["Pending", "Under Review"].includes(co.status))
-    .reduce((s, co) => s + Number(co.amount), 0);
+  const { totalAllocated, totalSpent, totalRemaining, overallPct, approvedCOValue, pendingCOValue } =
+    useMemo(() => {
+      const totalAllocated = budgets.reduce((s, b) => s + Number(b.allocated), 0);
+      const totalSpent = budgets.reduce((s, b) => s + Number(b.spent), 0);
+      const totalRemaining = totalAllocated - totalSpent;
+      const overallPct = pct(totalSpent, totalAllocated);
+      const approvedCOValue = changeOrders
+        .filter(co => co.status === "Approved")
+        .reduce((s, co) => s + Number(co.amount), 0);
+      const pendingCOValue = changeOrders
+        .filter(co => ["Pending", "Under Review"].includes(co.status))
+        .reduce((s, co) => s + Number(co.amount), 0);
+      return { totalAllocated, totalSpent, totalRemaining, overallPct, approvedCOValue, pendingCOValue };
+    }, [budgets, changeOrders]);
 
   // ── Budget by category ──────────────────────────────────────────────────────
-  const categoryMap: Record<string, { allocated: number; spent: number }> = {};
-  budgets.forEach(b => {
-    if (!categoryMap[b.category]) categoryMap[b.category] = { allocated: 0, spent: 0 };
-    categoryMap[b.category].allocated += Number(b.allocated);
-    categoryMap[b.category].spent += Number(b.spent);
-  });
-  const categoryData = Object.entries(categoryMap)
-    .map(([cat, d]) => ({
-      category: cat,
-      allocated: d.allocated,
-      spent: d.spent,
-      remaining: d.allocated - d.spent,
-      pct: pct(d.spent, d.allocated),
-    }))
-    .sort((a, b) => b.pct - a.pct);
+  const categoryData = useMemo(() => {
+    const categoryMap: Record<string, { allocated: number; spent: number }> = {};
+    budgets.forEach(b => {
+      if (!categoryMap[b.category]) categoryMap[b.category] = { allocated: 0, spent: 0 };
+      categoryMap[b.category].allocated += Number(b.allocated);
+      categoryMap[b.category].spent += Number(b.spent);
+    });
+    return Object.entries(categoryMap)
+      .map(([cat, d]) => ({
+        category: cat,
+        allocated: d.allocated,
+        spent: d.spent,
+        remaining: d.allocated - d.spent,
+        pct: pct(d.spent, d.allocated),
+      }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [budgets]);
 
   // ── Budget by project (using projects table budget/spent) ───────────────────
-  const projectData = projects
-    .filter(p => p.budget > 0)
-    .map(p => ({
-      name: p.name.length > 20 ? p.name.slice(0, 18) + "…" : p.name,
-      budget: Number(p.budget),
-      spent: Number(p.spent),
-      pct: pct(Number(p.spent), Number(p.budget)),
-    }))
-    .sort((a, b) => b.pct - a.pct)
-    .slice(0, 10);
+  const projectData = useMemo(() =>
+    projects
+      .filter(p => p.budget > 0)
+      .map(p => ({
+        name: p.name.length > 20 ? p.name.slice(0, 18) + "…" : p.name,
+        budget: Number(p.budget),
+        spent: Number(p.spent),
+        pct: pct(Number(p.spent), Number(p.budget)),
+      }))
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 10),
+  [projects]);
 
   // ── Overrun risk alerts ──────────────────────────────────────────────────────
-  const overrunProjects = projects.filter(p =>
-    p.budget > 0 && Number(p.spent) / Number(p.budget) >= 0.8
-  );
-  const overBudgetCategories = categoryData.filter(c => c.pct >= 100);
+  const overrunProjects = useMemo(() =>
+    projects.filter(p => p.budget > 0 && Number(p.spent) / Number(p.budget) >= 0.8),
+  [projects]);
+  const overBudgetCategories = useMemo(() =>
+    categoryData.filter(c => c.pct >= 100),
+  [categoryData]);
 
   // ── Cost-at-completion forecast ──────────────────────────────────────────────
-  // Simple: total allocated * (1 + overallPct/100 - 1) if trending over, else stable
-  const costAtCompletion = overallPct > 0
-    ? totalSpent + (totalRemaining * (overallPct / 100))
-    : totalAllocated;
-  const forecastVariance = costAtCompletion - totalAllocated;
+  const { costAtCompletion, forecastVariance } = useMemo(() => {
+    const costAtCompletion = overallPct > 0
+      ? totalSpent + (totalRemaining * (overallPct / 100))
+      : totalAllocated;
+    return { costAtCompletion, forecastVariance: costAtCompletion - totalAllocated };
+  }, [overallPct, totalSpent, totalRemaining, totalAllocated]);
 
   return (
     <div className="space-y-6 animate-fade-in">

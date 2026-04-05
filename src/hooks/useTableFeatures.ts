@@ -63,6 +63,8 @@ export function useTableFeatures<T extends { id: string }>(
 
   const clearSelection = () => setSelected(new Set());
 
+  const selectedItems = useMemo(() => data.filter((i) => selected.has(i.id)), [data, selected]);
+
   return {
     rows,
     allSorted: sorted,
@@ -75,7 +77,7 @@ export function useTableFeatures<T extends { id: string }>(
     total,
     pageSize,
     selected,
-    selectedItems: data.filter((i) => selected.has(i.id)),
+    selectedItems,
     selectedCount: selected.size,
     toggleSelect,
     toggleSelectAll,

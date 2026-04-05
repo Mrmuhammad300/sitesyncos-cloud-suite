@@ -8,9 +8,17 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type NotificationPreferences } from "@/hooks/useAuth";
 import { User, Bell, Palette } from "lucide-react";
 import { toast } from "sonner";
+
+const DEFAULT_PREFS: NotificationPreferences = {
+  rfi_updates: true,
+  draw_approvals: true,
+  budget_alerts: true,
+  daily_reminders: true,
+  system_announcements: true,
+};
 
 const STORAGE_KEY = "sitesyncos-appearance";
 
@@ -23,10 +31,17 @@ function loadAppearance() {
 }
 
 export default function SettingsPage() {
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile, updatePreferences } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
   const [appearance, setAppearance] = useState(loadAppearance);
+
+  // Derive notification prefs from profile (falls back to defaults)
+  const notifPrefs: NotificationPreferences = {
+    ...DEFAULT_PREFS,
+    ...(profile?.preferences as { notifications?: NotificationPreferences } | null)?.notifications,
+  };
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance));
@@ -43,6 +58,13 @@ export default function SettingsPage() {
     } else {
       toast.success("Profile updated successfully");
     }
+  };
+
+  const handleTogglePref = async (key: keyof NotificationPreferences, value: boolean) => {
+    setSavingPrefs(true);
+    const { error } = await updatePreferences({ [key]: value });
+    setSavingPrefs(false);
+    if (error) toast.error(`Failed to save preference: ${error.message}`);
   };
 
   const handleChangePassword = async () => {
@@ -126,22 +148,31 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Notification Preferences</CardTitle>
-              <CardDescription className="text-xs">Choose which notifications you receive.</CardDescription>
+              <CardDescription className="text-xs">
+                Preferences are saved to your account and sync across devices.
+                {savingPrefs && <span className="ml-2 text-muted-foreground">Saving…</span>}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { label: "RFI Updates", desc: "When an RFI is assigned to you or updated" },
-                { label: "Draw Request Approvals", desc: "When a draw is approved or rejected" },
-                { label: "Budget Alerts", desc: "When a budget line exceeds threshold" },
-                { label: "Daily Report Reminders", desc: "Reminder to file end-of-day reports" },
-                { label: "System Announcements", desc: "Platform updates and maintenance" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between">
+              {(
+                [
+                  { key: "rfi_updates" as const, label: "RFI Updates", desc: "When an RFI is assigned to you or updated" },
+                  { key: "draw_approvals" as const, label: "Draw Request Approvals", desc: "When a draw is approved or rejected" },
+                  { key: "budget_alerts" as const, label: "Budget Alerts", desc: "When a budget line exceeds threshold" },
+                  { key: "daily_reminders" as const, label: "Daily Report Reminders", desc: "Reminder to file end-of-day reports" },
+                  { key: "system_announcements" as const, label: "System Announcements", desc: "Platform updates and maintenance" },
+                ] as { key: keyof NotificationPreferences; label: string; desc: string }[]
+              ).map((item) => (
+                <div key={item.key} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">{item.label}</p>
                     <p className="text-xs text-muted-foreground">{item.desc}</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={notifPrefs[item.key]}
+                    disabled={savingPrefs}
+                    onCheckedChange={(v) => handleTogglePref(item.key, v)}
+                  />
                 </div>
               ))}
             </CardContent>

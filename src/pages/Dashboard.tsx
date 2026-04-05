@@ -1,9 +1,10 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
-  Building2, DollarSign, HardHat, FileText, ArrowUpRight, ArrowDownRight,
+  Building2, DollarSign, HardHat, FileText,
   Activity, Brain, Sparkles
 } from "lucide-react";
 import { AiInsightCard } from "@/components/AiInsightCard";
@@ -69,25 +70,27 @@ export default function Dashboard() {
   const { data: rfis = [] } = useRFIs();
   const { data: properties = [] } = useProperties();
 
-  const revenueData = buildRevenueData(projects);
+  const revenueData = useMemo(() => buildRevenueData(projects), [projects]);
 
-  const activeProjects = projects.filter(p => p.status !== "Complete");
-  const portfolioValue = properties.reduce((s, p) => s + Number(p.price), 0);
-  const openRFIs = rfis.filter(r => r.status !== "Closed").length;
-  const monthlySpend = activeProjects.reduce((s, p) => s + Number(p.spent), 0);
+  const activeProjects = useMemo(() => projects.filter(p => p.status !== "Complete"), [projects]);
+  const portfolioValue = useMemo(() => properties.reduce((s, p) => s + Number(p.price), 0), [properties]);
+  const openRFIs = useMemo(() => rfis.filter(r => r.status !== "Closed").length, [rfis]);
+  const monthlySpend = useMemo(() => activeProjects.reduce((s, p) => s + Number(p.spent), 0), [activeProjects]);
 
-  const statusCounts = ["On Track", "At Risk", "Behind", "Complete"].map(name => ({
-    name,
-    value: projects.filter(p => p.status === name).length,
-    color: STATUS_COLORS[name],
-  })).filter(s => s.value > 0);
+  const statusCounts = useMemo(() =>
+    ["On Track", "At Risk", "Behind", "Complete"].map(name => ({
+      name,
+      value: projects.filter(p => p.status === name).length,
+      color: STATUS_COLORS[name],
+    })).filter(s => s.value > 0),
+  [projects]);
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { label: "Active Projects", value: String(activeProjects.length), icon: HardHat, color: "text-primary" },
     { label: "Total Portfolio", value: fmt(portfolioValue), icon: Building2, color: "text-success" },
     { label: "Open RFIs", value: String(openRFIs), icon: FileText, color: "text-warning" },
     { label: "Total Spend", value: fmt(monthlySpend), icon: DollarSign, color: "text-accent" },
-  ];
+  ], [activeProjects.length, portfolioValue, openRFIs, monthlySpend]);
 
   return (
     <div className="space-y-6 animate-fade-in">

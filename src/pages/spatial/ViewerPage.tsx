@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef, Suspense, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Grid, Environment, PerspectiveCamera, Html } from "@react-three/drei";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,14 @@ const initialLayers: LayerState[] = [
   { name: "Site Work", visible: false, color: "#ef4444", count: 980 },
 ];
 
+// Memoized position arrays — created once, not on every render
+const SLAB_POSITIONS = [1, 2, 3, 4, 5] as const;
+const COLUMN_POSITIONS = [-3, 0, 3].flatMap(x => [-2, 2].map(z => ({ x, z })));
+const WALL_ROTS = [0, Math.PI / 2, Math.PI, -Math.PI / 2] as const;
+const DUCT_Y = [2, 5, 8, 11] as const;
+const PIPE_X = [-2, 2] as const;
+const ELEC_Y = [1, 4, 7, 10, 13] as const;
+
 function Building({ layers }: { layers: LayerState[] }) {
   const groupRef = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
@@ -49,42 +57,42 @@ function Building({ layers }: { layers: LayerState[] }) {
         </mesh>
       )}
       {/* Floor slabs */}
-      {structVisible && [1, 2, 3, 4, 5].map(i => (
+      {structVisible && SLAB_POSITIONS.map(i => (
         <mesh key={`slab-${i}`} position={[0, i * 3, 0]}>
           <boxGeometry args={[7.5, 0.2, 5.5]} />
           <meshStandardMaterial color="#94a3b8" transparent opacity={0.6} />
         </mesh>
       ))}
       {/* Columns */}
-      {structVisible && [-3, 0, 3].flatMap(x => [-2, 2].map(z => (
+      {structVisible && COLUMN_POSITIONS.map(({ x, z }) => (
         <mesh key={`col-${x}-${z}`} position={[x, 7.5, z]}>
           <boxGeometry args={[0.3, 15, 0.3]} />
           <meshStandardMaterial color="#3b82f6" />
         </mesh>
-      )))}
+      ))}
       {/* Glass facade */}
-      {archVisible && [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((rot, i) => (
+      {archVisible && WALL_ROTS.map((rot, i) => (
         <mesh key={`wall-${i}`} position={[Math.sin(rot) * 3.8, 7.5, Math.cos(rot) * (i % 2 === 0 ? 2.8 : 3.8)]} rotation={[0, rot, 0]}>
           <planeGeometry args={[i % 2 === 0 ? 5.5 : 7.5, 14.5]} />
           <meshStandardMaterial color="#93c5fd" transparent opacity={0.25} side={THREE.DoubleSide} />
         </mesh>
       ))}
       {/* HVAC ducts */}
-      {hvacVisible && [2, 5, 8, 11].map(y => (
+      {hvacVisible && DUCT_Y.map(y => (
         <mesh key={`duct-${y}`} position={[0, y + 0.5, 0]}>
           <boxGeometry args={[6, 0.15, 0.3]} />
           <meshStandardMaterial color="#8b5cf6" />
         </mesh>
       ))}
       {/* Plumbing risers */}
-      {plumbVisible && [-2, 2].map(x => (
+      {plumbVisible && PIPE_X.map(x => (
         <mesh key={`pipe-${x}`} position={[x, 7.5, 0]}>
           <cylinderGeometry args={[0.05, 0.05, 14.5, 8]} />
           <meshStandardMaterial color="#06b6d4" />
         </mesh>
       ))}
       {/* Electrical conduits */}
-      {elecVisible && [1, 4, 7, 10, 13].map(y => (
+      {elecVisible && ELEC_Y.map(y => (
         <mesh key={`elec-${y}`} position={[2.5, y, 1.5]}>
           <boxGeometry args={[0.08, 0.08, 4]} />
           <meshStandardMaterial color="#eab308" />
@@ -109,7 +117,7 @@ function Scene({ layers }: { layers: LayerState[] }) {
       <ambientLight intensity={0.4} />
       <directionalLight position={[10, 20, 10]} intensity={1} castShadow />
       <directionalLight position={[-5, 10, -5]} intensity={0.3} />
-      <Grid args={[40, 40]} position={[0, 0, 0]} cellSize={1} cellThickness={0.5} cellColor="#334155" sectionSize={5} sectionThickness={1} sectionColor="#475569" fadeDistance={50} />
+      <Grid args={[20, 20]} position={[0, 0, 0]} cellSize={1} cellThickness={0.5} cellColor="#334155" sectionSize={5} sectionThickness={1} sectionColor="#475569" fadeDistance={40} />
       <Building layers={layers} />
       <Environment preset="city" />
     </>

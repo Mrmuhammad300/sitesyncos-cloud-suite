@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Users, Search, Shield, UserCog, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Users, Search, Shield, UserCog, AlertTriangle, UserPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -41,13 +42,17 @@ function roleLabel(r: string) {
 
 export default function TeamPage() {
   const qc = useQueryClient();
-  const { profile: myProfile } = useAuth();
+  const { profile: myProfile, user: myUser } = useAuth();
   const isAdmin = myProfile?.role === "admin" || myProfile?.role === "super_admin";
 
-  const [search, setSearch]     = useState("");
+  const [search, setSearch]         = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [editUser, setEditUser] = useState<Profile | null>(null);
-  const [editRole, setEditRole] = useState<AppRole>("field_staff");
+  const [editUser, setEditUser]     = useState<Profile | null>(null);
+  const [editRole, setEditRole]     = useState<AppRole>("field_staff");
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole]   = useState<AppRole>("field_staff");
+  const [removeUser, setRemoveUser]   = useState<Profile | null>(null);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["team-profiles"],
@@ -77,6 +82,45 @@ export default function TeamPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const inviteMember = useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: AppRole }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("invite-member", {
+        body: { email, role },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (res.error) throw new Error(res.error.message);
+      const body = res.data as { error?: string };
+      if (body?.error) throw new Error(body.error);
+    },
+    onSuccess: () => {
+      toast.success(`Invite sent to ${inviteEmail}`);
+      setShowInvite(false);
+      setInviteEmail("");
+      setInviteRole("field_staff");
+      qc.invalidateQueries({ queryKey: ["team-profiles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeMember = useMutation({
+    mutationFn: async (userId: string) => {
+      // Soft-remove by setting role to field_staff and clearing display name
+      // Hard-delete from auth requires service_role; this revokes access via RLS role downgrade
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: "field_staff" as AppRole, display_name: null, updated_at: new Date().toISOString() })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Member access revoked");
+      setRemoveUser(null);
+      qc.invalidateQueries({ queryKey: ["team-profiles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtered = profiles.filter((p) => {
     const ms = search === "" ||
       (p.display_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -100,10 +144,15 @@ export default function TeamPage() {
             <Badge variant="outline" className="text-[10px]">System</Badge>
             {isAdmin && <Badge variant="secondary" className="text-[10px] flex items-center gap-1"><Shield className="h-3 w-3" />Admin View</Badge>}
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
             Manage team members and role assignments.
           </p>
         </div>
+        {isAdmin && (
+          <Button size="sm" onClick={() => setShowInvite(true)}>
+            <UserPlus className="h-4 w-4 mr-1.5" /> Invite Member
+          </Button>
+        )}
       </div>
 
       {/* Role distribution */}
@@ -195,14 +244,26 @@ export default function TeamPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => { setEditUser(p); setEditRole(p.role); }}
-                        >
-                          <UserCog className="h-3.5 w-3.5" />Edit
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => { setEditUser(p); setEditRole(p.role); }}
+                          >
+                            <UserCog className="h-3.5 w-3.5" />Edit
+                          </Button>
+                          {p.user_id !== myUser?.id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+                              onClick={() => setRemoveUser(p)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -212,17 +273,6 @@ export default function TeamPage() {
           </Table>
         </Card>
       )}
-
-      {/* Invite note */}
-      <div className="p-4 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground mb-1 flex items-center gap-1.5">
-          <Users className="h-4 w-4" />Inviting New Members
-        </p>
-        <p>
-          New users can register at the login page using your organization's email domain.
-          Admins can update their role after their first sign-in.
-        </p>
-      </div>
 
       {/* Edit role dialog */}
       <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
@@ -255,6 +305,73 @@ export default function TeamPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Invite member dialog */}
+      <Dialog open={showInvite} onOpenChange={(o) => { setShowInvite(o); if (!o) { setInviteEmail(""); setInviteRole("field_staff"); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-4 w-4" />Invite Team Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email Address</Label>
+              <Input
+                type="email"
+                placeholder="colleague@company.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Initial Role</Label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_ROLES.filter(r => r !== "super_admin").map((r) => (
+                    <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              An invite email will be sent. The member can set their password on first sign-in.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowInvite(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={inviteMember.isPending || !inviteEmail.includes("@")}
+                onClick={() => inviteMember.mutate({ email: inviteEmail, role: inviteRole })}
+              >
+                {inviteMember.isPending ? "Sending…" : "Send Invite"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove member confirmation */}
+      <AlertDialog open={!!removeUser} onOpenChange={(o) => { if (!o) setRemoveUser(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke access for {removeUser?.display_name ?? "this member"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Their role will be downgraded to Field Staff, removing admin and management access.
+              This can be reversed by re-assigning their role.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removeUser && removeMember.mutate(removeUser.user_id)}
+            >
+              Revoke Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

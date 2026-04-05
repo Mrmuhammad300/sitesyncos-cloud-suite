@@ -2,10 +2,27 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface NotificationPreferences {
+  rfi_updates: boolean;
+  draw_approvals: boolean;
+  budget_alerts: boolean;
+  daily_reminders: boolean;
+  system_announcements: boolean;
+}
+
+const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+  rfi_updates: true,
+  draw_approvals: true,
+  budget_alerts: true,
+  daily_reminders: true,
+  system_announcements: true,
+};
+
 interface Profile {
   display_name: string | null;
   role: string;
   avatar_url: string | null;
+  preferences: { notifications?: NotificationPreferences } | null;
 }
 
 interface AuthContextType {
@@ -17,6 +34,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Pick<Profile, "display_name" | "avatar_url">>) => Promise<{ error: Error | null }>;
+  updatePreferences: (prefs: Partial<NotificationPreferences>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -31,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("display_name, role, avatar_url")
+      .select("display_name, role, avatar_url, preferences")
       .eq("user_id", userId)
       .single();
-    if (data) setProfile(data);
+    if (data) setProfile(data as Profile);
   };
 
   useEffect(() => {
@@ -93,12 +111,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const updatePreferences = async (prefs: Partial<NotificationPreferences>) => {
+    if (!user) return { error: new Error("Not authenticated") };
+    const current = (profile?.preferences as { notifications?: NotificationPreferences } | null) ?? {};
+    const merged = {
+      ...current,
+      notifications: { ...DEFAULT_NOTIFICATION_PREFS, ...current.notifications, ...prefs },
+    };
+    const { error } = await supabase
+      .from("profiles")
+      .update({ preferences: merged, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id);
+    if (!error) {
+      setProfile(prev => prev ? { ...prev, preferences: merged } : prev);
+    }
+    return { error: error as Error | null };
+  };
+
   const refreshProfile = async () => {
     if (user) await fetchProfile(user.id);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut, updateProfile, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut, updateProfile, updatePreferences, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
