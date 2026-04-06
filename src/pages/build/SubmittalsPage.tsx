@@ -49,6 +49,7 @@ export default function SubmittalsPage() {
   const [form, setForm] = useState({
     title: "", spec_section: "", submitted_by: "", reviewer: "", due_date: "",
   });
+  const [formError, setFormError] = useState("");
 
   const filtered = submittals.filter(s => {
     const ms = s.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -101,7 +102,8 @@ export default function SubmittalsPage() {
   const nextNumber = `SUB-${String(submittals.length + 1).padStart(4, "0")}`;
 
   const handleSubmit = () => {
-    if (!form.title) return;
+    if (!form.title.trim()) { setFormError("Title is required."); return; }
+    setFormError("");
     createSubmittal.mutate({
       submittal_number: nextNumber,
       title: form.title,
@@ -400,11 +402,15 @@ export default function SubmittalsPage() {
       </Dialog>
 
       {/* Create Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFormError(""); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>New Submittal</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Title *</Label>
+              <Input value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFormError(""); }} className={formError ? "border-destructive" : ""} />
+              {formError && <p className="text-xs text-destructive mt-1">{formError}</p>}
+            </div>
             <div><Label className="text-xs">Spec Section</Label><Input value={form.spec_section} onChange={e => setForm(f => ({ ...f, spec_section: e.target.value }))} placeholder="e.g. 03 30 00" /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label className="text-xs">Submitted By</Label><Input value={form.submitted_by} onChange={e => setForm(f => ({ ...f, submitted_by: e.target.value }))} /></div>

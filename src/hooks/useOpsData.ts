@@ -52,6 +52,19 @@ export function useCreateDrawRequest() {
   });
 }
 
+export function useUpdateDrawRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"draw_requests"> & { id: string }) => {
+      const { data, error } = await supabase.from("draw_requests").update(updates).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["draw_requests"] }); toast.success("Draw request updated"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useTenants() {
   return useQuery({
     queryKey: ["tenants"],
