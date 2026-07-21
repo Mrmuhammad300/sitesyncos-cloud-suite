@@ -22,6 +22,7 @@ const CostDashboardPage = lazy(() => import("@/pages/ops/CostDashboardPage"));
 const DrawRequestsPage = lazy(() => import("@/pages/ops/DrawRequestsPage"));
 const TenantsPage = lazy(() => import("@/pages/ops/TenantsPage"));
 const WorkOrdersPage = lazy(() => import("@/pages/ops/WorkOrdersPage"));
+const ContractorsPage = lazy(() => import("@/pages/ops/ContractorsPage"));
 const DocumentsPage = lazy(() => import("@/pages/ops/DocumentsPage"));
 const AgentsPage = lazy(() => import("@/pages/ai/AgentsPage"));
 const AnalyticsPage = lazy(() => import("@/pages/ai/AnalyticsPage"));
@@ -72,6 +73,7 @@ export function AnimatedRoutes() {
             <Route path="/ops/draws" element={<DrawRequestsPage />} />
             <Route path="/ops/tenants" element={<TenantsPage />} />
             <Route path="/ops/work-orders" element={<WorkOrdersPage />} />
+            <Route path="/ops/contractors" element={<ContractorsPage />} />
             <Route path="/ops/documents" element={<DocumentsPage />} />
             {/* Treasury */}
             <Route path="/treasury/ledger" element={<TreasuryPage />} />

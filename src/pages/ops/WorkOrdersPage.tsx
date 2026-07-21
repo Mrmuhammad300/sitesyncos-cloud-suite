@@ -9,13 +9,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wrench, Clock, CheckCircle2, AlertTriangle, Trash2, Download } from "lucide-react";
+import { Search, Plus, Wrench, Clock, CheckCircle2, AlertTriangle, Trash2, Download, ListChecks } from "lucide-react";
 import { useWorkOrders, useCreateWorkOrder, useDeleteWorkOrder } from "@/hooks/useOpsData";
+import { useContractors, useChecklistProgress } from "@/hooks/useFieldOps";
 import { Tables } from "@/integrations/supabase/types";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { exportToCSV } from "@/lib/export";
+import { ChecklistPanel } from "@/components/ChecklistPanel";
+import { WorkOrderChat } from "@/components/WorkOrderChat";
 
 type WorkOrder = Tables<"work_orders">;
 
@@ -40,9 +43,10 @@ const WorkOrdersPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [detail, setDetail] = useState<WorkOrder | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", property_name: "", unit: "", due_date: "" });
+  const [form, setForm] = useState({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", assigned_contractor_id: "", property_name: "", unit: "", due_date: "" });
   const filters = ["All", "Open", "In Progress", "Completed", "On Hold", "Cancelled"];
   const { data: wos = [], isLoading } = useWorkOrders();
+  const { data: contractors = [] } = useContractors();
   const createWO = useCreateWorkOrder();
   const deleteWO = useDeleteWorkOrder();
 
@@ -54,6 +58,8 @@ const WorkOrdersPage = () => {
     rows, sortKey, sortDir, toggleSort,
     page, setPage, totalPages, total, pageSize,
   } = useTableFeatures<WorkOrder>(filtered, { pageSize: 25 });
+
+  const { data: checklistProgress = {} } = useChecklistProgress(rows.map((w) => w.id));
 
   const kpis = [
     { label: "Total WOs", value: wos.length, icon: <Wrench className="h-5 w-5 text-primary" /> },
@@ -72,12 +78,18 @@ const WorkOrdersPage = () => {
       priority: form.priority,
       category: form.category || null,
       assigned_to: form.assigned_to || null,
+      assigned_contractor_id: form.assigned_contractor_id || null,
       property_name: form.property_name || null,
       unit: form.unit || null,
       due_date: form.due_date || null,
     });
     setCreateOpen(false);
-    setForm({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", property_name: "", unit: "", due_date: "" });
+    setForm({ title: "", description: "", priority: "Medium", category: "", assigned_to: "", assigned_contractor_id: "", property_name: "", unit: "", due_date: "" });
+  };
+
+  const handleContractorSelect = (contractorId: string) => {
+    const c = contractors.find((c) => c.id === contractorId);
+    setForm((f) => ({ ...f, assigned_contractor_id: contractorId, assigned_to: c?.company_name ?? f.assigned_to }));
   };
 
   const handleExportCSV = () => {
@@ -130,6 +142,11 @@ const WorkOrdersPage = () => {
                 <Badge className={`text-[10px] ${priorityColor[w.priority]}`}>{w.priority}</Badge>
                 {w.category && <span className="text-xs text-muted-foreground">{w.category}</span>}
                 {w.assigned_to && <span className="text-xs text-muted-foreground">{w.assigned_to}</span>}
+                {checklistProgress[w.id]?.total > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <ListChecks className="h-3 w-3" />{checklistProgress[w.id].done}/{checklistProgress[w.id].total}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -149,6 +166,7 @@ const WorkOrdersPage = () => {
                   <TableHead>Category</TableHead>
                   <SortableHeader label="Assigned To" sortKey="assigned_to" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
                   <SortableHeader label="Due Date" sortKey="due_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                  <TableHead>Checklist</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -162,6 +180,9 @@ const WorkOrdersPage = () => {
                     <TableCell>{w.category || "—"}</TableCell>
                     <TableCell>{w.assigned_to || "—"}</TableCell>
                     <TableCell className="text-sm">{w.due_date || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {checklistProgress[w.id]?.total > 0 ? `${checklistProgress[w.id].done}/${checklistProgress[w.id].total}` : "—"}
+                    </TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(w.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
@@ -169,7 +190,7 @@ const WorkOrdersPage = () => {
                     </TableCell>
                   </TableRow>
                 ))}
-                {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No work orders found</TableCell></TableRow>}
+                {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No work orders found</TableCell></TableRow>}
               </TableBody>
             </Table>
             <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
@@ -178,7 +199,7 @@ const WorkOrdersPage = () => {
       </CardContent></Card>
 
       <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><span className="font-mono text-sm text-muted-foreground">{detail?.wo_number}</span>{detail?.title}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2"><Badge className={statusConfig[detail?.status || ""]}>{detail?.status}</Badge><Badge className={priorityColor[detail?.priority || ""]}>{detail?.priority}</Badge></div>
@@ -191,6 +212,8 @@ const WorkOrdersPage = () => {
               <div><span className="text-muted-foreground">Completed:</span> {detail?.completed_date || "—"}</div>
             </div>
             {detail?.description && <div><Label className="text-muted-foreground">Description</Label><p className="text-sm mt-1">{detail.description}</p></div>}
+            {detail && <div className="pt-2 border-t"><ChecklistPanel workOrderId={detail.id} /></div>}
+            {detail && <div className="pt-2 border-t"><WorkOrderChat workOrderId={detail.id} /></div>}
           </div>
         </DialogContent>
       </Dialog>
@@ -214,6 +237,15 @@ const WorkOrdersPage = () => {
                   <SelectContent><SelectItem value="Plumbing">Plumbing</SelectItem><SelectItem value="Electrical">Electrical</SelectItem><SelectItem value="HVAC">HVAC</SelectItem><SelectItem value="Structural">Structural</SelectItem><SelectItem value="General">General</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent>
                 </Select>
               </div>
+            </div>
+            <div><Label>Contractor</Label>
+              <Select value={form.assigned_contractor_id} onValueChange={handleContractorSelect}>
+                <SelectTrigger><SelectValue placeholder="Select from roster (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}{c.trade ? ` — ${c.trade}` : ""}</SelectItem>)}
+                  {contractors.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">No contractors yet — add one in Contractors.</div>}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Property</Label><Input value={form.property_name} onChange={(e) => setForm({ ...form, property_name: e.target.value })} placeholder="Property name" /></div>

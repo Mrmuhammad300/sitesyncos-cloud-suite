@@ -10,13 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, CheckSquare, Trash2, Download, Printer, CheckCircle2 } from "lucide-react";
+import { Plus, Search, CheckSquare, Trash2, Download, Printer, CheckCircle2, ListChecks } from "lucide-react";
 import { useWorkOrders, useCreateWorkOrder, useUpdateWorkOrder, useDeleteWorkOrder } from "@/hooks/useOpsData";
+import { useContractors, useChecklistProgress } from "@/hooks/useFieldOps";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { exportToCSV, printToPDF } from "@/lib/export";
+import { ChecklistPanel } from "@/components/ChecklistPanel";
+import { WorkOrderChat } from "@/components/WorkOrderChat";
 import type { Tables } from "@/integrations/supabase/types";
 
 type WorkOrder = Tables<"work_orders">;
@@ -41,6 +44,7 @@ const PRIORITIES = ["Emergency", "High", "Medium", "Low"] as const;
 
 export default function PunchListPage() {
   const { data: allWorkOrders = [], isLoading } = useWorkOrders();
+  const { data: contractors = [] } = useContractors();
   const createWO = useCreateWorkOrder();
   const updateWO = useUpdateWorkOrder();
   const deleteWO = useDeleteWorkOrder();
@@ -51,7 +55,7 @@ export default function PunchListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detail, setDetail] = useState<WorkOrder | null>(null);
   const [form, setForm] = useState({
-    title: "", description: "", priority: "Medium", assigned_to: "",
+    title: "", description: "", priority: "Medium", assigned_to: "", assigned_contractor_id: "",
     property_name: "", unit: "", due_date: "",
   });
 
@@ -73,6 +77,8 @@ export default function PunchListPage() {
     isAllSelected, isIndeterminate,
   } = useTableFeatures<WorkOrder>(filtered, { pageSize: 25 });
 
+  const { data: checklistProgress = {} } = useChecklistProgress(rows.map((w) => w.id));
+
   const openCount = punchItems.filter(w => w.status === "Open").length;
   const inProgressCount = punchItems.filter(w => w.status === "In Progress").length;
   const completedCount = punchItems.filter(w => w.status === "Completed").length;
@@ -90,12 +96,18 @@ export default function PunchListPage() {
       priority: form.priority,
       category: "Punch List",
       assigned_to: form.assigned_to || null,
+      assigned_contractor_id: form.assigned_contractor_id || null,
       property_name: form.property_name || null,
       unit: form.unit || null,
       due_date: form.due_date || null,
     });
     setOpen(false);
-    setForm({ title: "", description: "", priority: "Medium", assigned_to: "", property_name: "", unit: "", due_date: "" });
+    setForm({ title: "", description: "", priority: "Medium", assigned_to: "", assigned_contractor_id: "", property_name: "", unit: "", due_date: "" });
+  };
+
+  const handleContractorSelect = (contractorId: string) => {
+    const c = contractors.find((c) => c.id === contractorId);
+    setForm((f) => ({ ...f, assigned_contractor_id: contractorId, assigned_to: c?.company_name ?? f.assigned_to }));
   };
 
   const handleExportCSV = () => {
@@ -217,6 +229,11 @@ export default function PunchListPage() {
                 <Badge variant="outline" className={`text-[10px] ${statusConfig[w.status] ?? ""}`}>{w.status}</Badge>
                 {w.assigned_to && <span className="text-xs text-muted-foreground">{w.assigned_to}</span>}
                 {w.due_date && <span className="text-xs text-muted-foreground">Due {w.due_date}</span>}
+                {checklistProgress[w.id]?.total > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <ListChecks className="h-3 w-3" />{checklistProgress[w.id].done}/{checklistProgress[w.id].total}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -247,6 +264,7 @@ export default function PunchListPage() {
                     <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
                     <SortableHeader label="Assigned To" sortKey="assigned_to" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
                     <SortableHeader label="Due Date" sortKey="due_date" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof WorkOrder)} />
+                    <TableHead>Checklist</TableHead>
                     <TableHead className="w-16" />
                   </TableRow>
                 </TableHeader>
@@ -279,6 +297,9 @@ export default function PunchListPage() {
                       </TableCell>
                       <TableCell className="text-sm">{w.assigned_to ?? "—"}</TableCell>
                       <TableCell className="text-sm">{w.due_date ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {checklistProgress[w.id]?.total > 0 ? `${checklistProgress[w.id].done}/${checklistProgress[w.id].total}` : "—"}
+                      </TableCell>
                       <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           {w.status !== "Completed" && (
@@ -306,7 +327,7 @@ export default function PunchListPage() {
                   ))}
                   {rows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
+                      <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">
                         No punch list items found.
                       </TableCell>
                     </TableRow>
@@ -321,7 +342,7 @@ export default function PunchListPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail} onOpenChange={o => !o && setDetail(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono text-sm text-muted-foreground">{detail?.wo_number}</span>
@@ -354,6 +375,8 @@ export default function PunchListPage() {
                 Mark as Completed
               </Button>
             )}
+            {detail && <div className="pt-2 border-t"><ChecklistPanel workOrderId={detail.id} /></div>}
+            {detail && <div className="pt-2 border-t"><WorkOrderChat workOrderId={detail.id} /></div>}
           </div>
         </DialogContent>
       </Dialog>
@@ -365,6 +388,16 @@ export default function PunchListPage() {
           <div className="space-y-3 mt-2">
             <div><Label className="text-xs">Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Deficiency description" /></div>
             <div><Label className="text-xs">Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Contractor</Label>
+              <Select value={form.assigned_contractor_id} onValueChange={handleContractorSelect}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select from roster (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}{c.trade ? ` — ${c.trade}` : ""}</SelectItem>)}
+                  {contractors.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">No contractors yet.</div>}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Priority</Label>

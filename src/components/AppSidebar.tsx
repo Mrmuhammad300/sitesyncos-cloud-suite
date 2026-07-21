@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
   LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText,
-  Wand2, AlertTriangle, MessageSquare
+  Wand2, AlertTriangle, MessageSquare, Smartphone
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -20,6 +20,7 @@ const moduleGroups = [
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
       { title: "Notifications", url: "/notifications", icon: Bell },
+      { title: "Field Mode", url: "/field", icon: Smartphone },
     ],
   },
   {
@@ -51,6 +52,7 @@ const moduleGroups = [
       { title: "Draw Requests", url: "/ops/draws", icon: CreditCard },
       { title: "Tenants", url: "/ops/tenants", icon: Users },
       { title: "Work Orders", url: "/ops/work-orders", icon: Wrench },
+      { title: "Contractors", url: "/ops/contractors", icon: HardHat },
       { title: "Documents", url: "/ops/documents", icon: FolderOpen },
     ],
   },

@@ -424,6 +424,45 @@ export type Database = {
           },
         ]
       }
+      contractors: {
+        Row: {
+          company_name: string
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          notes: string | null
+          phone: string | null
+          status: string
+          trade: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_reports: {
         Row: {
           activities: string[] | null
@@ -1099,8 +1138,88 @@ export type Database = {
         }
         Relationships: []
       }
+      work_order_checklist_items: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          is_complete: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+          work_order_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+          work_order_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_checklist_items_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          work_order_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          work_order_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_orders: {
         Row: {
+          assigned_contractor_id: string | null
           assigned_to: string | null
           category: string | null
           completed_date: string | null
@@ -1118,6 +1237,7 @@ export type Database = {
           wo_number: string
         }
         Insert: {
+          assigned_contractor_id?: string | null
           assigned_to?: string | null
           category?: string | null
           completed_date?: string | null
@@ -1135,6 +1255,7 @@ export type Database = {
           wo_number: string
         }
         Update: {
+          assigned_contractor_id?: string | null
           assigned_to?: string | null
           category?: string | null
           completed_date?: string | null
@@ -1151,7 +1272,15 @@ export type Database = {
           updated_at?: string
           wo_number?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_assigned_contractor_id_fkey"
+            columns: ["assigned_contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
