@@ -22,11 +22,14 @@ export default function LoginPage() {
 
   const friendly = (msg: string) => {
     const m = msg.toLowerCase();
+    if (m.includes("weak") || m.includes("pwned")) return "That password has been found in a data breach — please choose a stronger, unique one.";
     if (m.includes("email not confirmed")) return "Check your inbox to confirm your email.";
     if (m.includes("invalid login") || m.includes("invalid_credentials")) return "Wrong email or password.";
     if (m.includes("already registered") || m.includes("user already")) return "That email is already registered — sign in instead.";
     if (m.includes("rate limit") || m.includes("over_email_send")) return "Too many attempts — try again shortly.";
     if (m.includes("password") && m.includes("6")) return "Password must be at least 6 characters.";
+    return msg;
+  };
     return msg;
   };
 
