@@ -30,8 +30,6 @@ export default function LoginPage() {
     if (m.includes("password") && m.includes("6")) return "Password must be at least 6 characters.";
     return msg;
   };
-    return msg;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
