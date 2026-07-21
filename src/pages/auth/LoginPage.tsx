@@ -20,17 +20,36 @@ export default function LoginPage() {
 
   if (session) { navigate("/", { replace: true }); return null; }
 
+  const friendly = (msg: string) => {
+    const m = msg.toLowerCase();
+    if (m.includes("email not confirmed")) return "Check your inbox to confirm your email.";
+    if (m.includes("invalid login") || m.includes("invalid_credentials")) return "Wrong email or password.";
+    if (m.includes("already registered") || m.includes("user already")) return "That email is already registered — sign in instead.";
+    if (m.includes("rate limit") || m.includes("over_email_send")) return "Too many attempts — try again shortly.";
+    if (m.includes("password") && m.includes("6")) return "Password must be at least 6 characters.";
+    return msg;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     if (isLogin) {
       const { error } = await signIn(email, password);
-      if (error) { toast.error(error.message); setLoading(false); return; }
+      if (error) { toast.error(friendly(error.message)); setLoading(false); return; }
       navigate("/");
     } else {
       const { error } = await signUp(email, password, displayName || undefined);
-      if (error) { toast.error(error.message); setLoading(false); return; }
-      toast.success("Account created! You can sign in now.");
+      if (error) { toast.error(friendly(error.message)); setLoading(false); return; }
+      // Auto-confirm is on; sign the user in immediately.
+      const { error: signInError } = await signIn(email, password);
+      if (signInError) {
+        toast.success("Account created! Please sign in.");
+        setIsLogin(true);
+        setLoading(false);
+        return;
+      }
+      toast.success("Welcome to SiteSync!");
+      navigate("/");
     }
     setLoading(false);
   };
