@@ -27,6 +27,7 @@ const AgentsPage = lazy(() => import("@/pages/ai/AgentsPage"));
 const AnalyticsPage = lazy(() => import("@/pages/ai/AnalyticsPage"));
 const SimulatorPage = lazy(() => import("@/pages/ai/SimulatorPage"));
 const AIAssistantPage = lazy(() => import("@/pages/ai/AIAssistantPage"));
+const AgentCompliancePage = lazy(() => import("@/pages/ai/AgentCompliancePage"));
 const ViewerPage = lazy(() => import("@/pages/spatial/ViewerPage"));
 const FloorPlansPage = lazy(() => import("@/pages/spatial/FloorPlansPage"));
 const GeneratorPage = lazy(() => import("@/pages/spatial/GeneratorPage"));
@@ -81,6 +82,7 @@ export function AnimatedRoutes() {
             <Route path="/ai/agents" element={<AgentsPage />} />
             <Route path="/ai/analytics" element={<AnalyticsPage />} />
             <Route path="/ai/simulator" element={<SimulatorPage />} />
+            <Route path="/ai/compliance" element={<AgentCompliancePage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
             {/* Spatial */}
             <Route path="/spatial/viewer" element={<ViewerPage />} />

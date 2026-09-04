@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_control_mappings: {
+        Row: {
+          agent_id: string
+          control_id: string
+          created_at: string
+          evidence: string | null
+          id: string
+          is_required: boolean
+          last_reviewed: string | null
+          notes: string | null
+          owner: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          control_id: string
+          created_at?: string
+          evidence?: string | null
+          id?: string
+          is_required?: boolean
+          last_reviewed?: string | null
+          notes?: string | null
+          owner?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          control_id?: string
+          created_at?: string
+          evidence?: string | null
+          id?: string
+          is_required?: boolean
+          last_reviewed?: string | null
+          notes?: string | null
+          owner?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_control_mappings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "agent_control_mappings_control_id_fkey"
+            columns: ["control_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_controls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_decisions: {
         Row: {
           agent_id: string
@@ -376,6 +433,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      compliance_controls: {
+        Row: {
+          applies_to: string[]
+          category: string | null
+          control_ref: string
+          created_at: string
+          description: string | null
+          framework: string
+          id: string
+          title: string
+        }
+        Insert: {
+          applies_to?: string[]
+          category?: string | null
+          control_ref: string
+          created_at?: string
+          description?: string | null
+          framework: string
+          id?: string
+          title: string
+        }
+        Update: {
+          applies_to?: string[]
+          category?: string | null
+          control_ref?: string
+          created_at?: string
+          description?: string | null
+          framework?: string
+          id?: string
+          title?: string
+        }
+        Relationships: []
       }
       compliance_items: {
         Row: {

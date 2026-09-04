@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
   Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
   LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText,
-  Wand2, AlertTriangle, MessageSquare
+  Wand2, AlertTriangle, MessageSquare, ShieldCheck
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -68,6 +68,7 @@ const moduleGroups = [
       { title: "Agents", url: "/ai/agents", icon: Brain },
       { title: "Analytics", url: "/ai/analytics", icon: Cpu },
       { title: "Simulator", url: "/ai/simulator", icon: Compass },
+      { title: "Automation Compliance", url: "/ai/compliance", icon: ShieldCheck },
     ],
   },
   {
