@@ -166,14 +166,27 @@ export function SceneGrid({ palette, size = 40 }: { palette: ScenePalette; size?
 }
 
 /** Studio lighting that works without an external HDR. */
-export function SceneLights({ palette }: { palette: ScenePalette }) {
+export function SceneLights({ palette, extent = 20 }: { palette: ScenePalette; /** Scene radius, scales fog and shadows. */ extent?: number }) {
+  const k = Math.max(extent, 10) / 20;
+  const shadow = Math.max(extent, 10) * 1.6;
   return (
     <>
       <color attach="background" args={[palette.canvas]} />
-      <fog attach="fog" args={[palette.canvas, 38, 90]} />
+      <fog attach="fog" args={[palette.canvas, 38 * k, 110 * k]} />
       <hemisphereLight args={[palette.foreground, palette.canvas, palette.dark ? 0.55 : 0.8]} />
       <ambientLight intensity={palette.dark ? 0.25 : 0.45} />
-      <directionalLight position={[12, 22, 10]} intensity={palette.dark ? 1.4 : 1.2} castShadow />
+      <directionalLight
+        position={[12 * k, 22 * k, 10 * k]}
+        intensity={palette.dark ? 1.4 : 1.2}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-camera-left={-shadow}
+        shadow-camera-right={shadow}
+        shadow-camera-top={shadow}
+        shadow-camera-bottom={-shadow}
+        shadow-camera-far={shadow * 4}
+      />
       <directionalLight position={[-8, 10, -6]} intensity={0.35} color={palette.data} />
     </>
   );
