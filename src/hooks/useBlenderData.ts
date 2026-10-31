@@ -192,6 +192,27 @@ export function useFloorPlanVariants(projectId?: string) {
   });
 }
 
+export function useCreateFloorPlanVariants() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Array<Pick<FloorPlanVariant, "variant_name" | "layout_json" | "metrics" | "notes"> & { project_id?: string | null; blender_job_id?: string | null }>) => {
+      const { data: existing } = await supabase.from("floor_plan_variants" as never).select("variant_number");
+      const start = ((existing ?? []) as { variant_number: number }[]).reduce((m, r) => Math.max(m, r.variant_number ?? 0), 0);
+      const { data, error } = await supabase
+        .from("floor_plan_variants" as never)
+        .insert(rows.map((r, i) => ({ ...r, variant_number: start + i + 1, status: "draft" })) as never)
+        .select();
+      if (error) throw error;
+      return data as FloorPlanVariant[];
+    },
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: ["floor_plan_variants"] });
+      toast.success(`${rows.length} floor plan options sent to Floor Plans`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useUpdateFloorPlanVariant() {
   const qc = useQueryClient();
   return useMutation({
