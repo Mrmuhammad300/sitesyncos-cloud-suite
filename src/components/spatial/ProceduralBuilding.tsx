@@ -50,7 +50,8 @@ function materialSpecs(p: ScenePalette, s: BuildingSpec): Record<MaterialKey, Ma
     glass: { color: glass, opacity: d ? 0.55 : 0.62, metalness: 0.35, roughness: 0.12, emissive: d ? "#9fc6dc" : "#000000", emissiveIntensity: d ? 0.12 : 0 },
     storefront: { color: d ? "#7fa7b8" : "#a9cbd8", opacity: 0.38, metalness: 0.5, roughness: 0.06, emissive: "#ffcf8a", emissiveIntensity: d ? 0.35 : 0.08 },
     mullion: { color: d ? "#454a54" : "#5f6670", metalness: 0.6, roughness: 0.35 },
-    spandrel: { color: d ? "#3a3f48" : "#9aa1ab", metalness: 0.3, roughness: 0.5 },
+    // Timber buildings expose the slab edge as a warm timber band.
+    spandrel: s.structure === "timber" ? { color: timber, roughness: 0.7 } : { color: d ? "#3a3f48" : "#9aa1ab", metalness: 0.3, roughness: 0.5 },
     cladding: { color: cladding[s.use], roughness: 0.8 },
     window: { color: d ? "#22394a" : "#3c5d72", metalness: 0.7, roughness: 0.1, emissive: "#ffd39a", emissiveIntensity: d ? 0.12 : 0 },
     fin: { color: s.structure === "timber" ? timber : d ? "#b8bec7" : "#d3d7dd", roughness: 0.6 },
@@ -224,7 +225,7 @@ export function ProceduralBuilding({ spec, palette, mode = "shaded", visible, pr
   }, [selectedId, geo]);
 
   return (
-    <group ref={group} scale={SCENE_SCALE}>
+    <group ref={group} name="building" scale={SCENE_SCALE}>
       {geo.parts.map((part) =>
         visible && visible[part.discipline] === false ? null : (
           <PartMesh

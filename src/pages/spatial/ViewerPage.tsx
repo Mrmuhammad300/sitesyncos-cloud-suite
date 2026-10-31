@@ -9,7 +9,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader, Panel, StatCard, StatusPill } from "@/components/os";
+import { EmptyState, PageHeader, Panel, StatCard, StatusPill } from "@/components/os";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { buildGeometry } from "@/lib/spatial/buildingGeometry";
+import { detectClashes, type Clash } from "@/lib/spatial/clashes";
+import { addAnnotation, listAnnotations, removeAnnotation, updateAnnotation, type Annotation } from "@/lib/spatial/annotations";
+import { useAuth } from "@/hooks/useAuth";
+import { Check, Trash2, Undo2 } from "lucide-react";
 import { useScenePalette, type ScenePalette } from "@/components/spatial/sceneTheme";
 import { ProceduralBuilding, buildingFraming, type PickedElement, type RenderMode } from "@/components/spatial/ProceduralBuilding";
 import { ModelFile, isRenderableModel } from "@/components/spatial/ModelFile";
@@ -167,12 +174,54 @@ export default function ViewerPage() {
   const [preset, setPreset] = useState<CameraPreset>("iso");
   const [nonce, setNonce] = useState(0);
   const [selection, setSelection] = useState<PickedElement | null>(null);
+  const [tab, setTab] = useState<"clashes" | "notes">("clashes");
+  const [noteText, setNoteText] = useState("");
+  const [notesVersion, setNotesVersion] = useState(0);
+  const issuesRef = useRef<HTMLDivElement>(null);
+  const { profile, user } = useAuth();
   const probe = useRef<HTMLSpanElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const model = models.find((m) => m.id === selectedModel) ?? models[0];
   const framing = useMemo(() => buildingFraming(model.spec), [model.spec]);
   const counts = useMemo(() => elementCounts(model.spec), [model.spec]);
   const layerCount = (l: LayerState) => counts[l.discipline];
+  const clashes = useMemo(() => detectClashes(buildGeometry(model.spec)), [model.spec]);
+  const critical = clashes.filter((c) => c.severity === "critical").length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const notes = useMemo(() => listAnnotations(model.id), [model.id, notesVersion]);
+  const openNotes = notes.filter((n) => !n.resolved).length;
+  const refreshNotes = () => setNotesVersion((v) => v + 1);
+
+  const showIssues = (t: "clashes" | "notes") => {
+    setTab(t);
+    issuesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const focusClash = (c: Clash) => {
+    const layer = c.a.part === "ducts" || c.a.part === "plant" ? "hvac" : c.a.part === "trays" ? "electrical" : c.a.part === "risers" ? "plumbing" : "structural";
+    setSelection({ id: c.a.id, label: c.a.label, level: c.a.level, discipline: layer as Discipline });
+    setMode("xray");
+    frame.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  const runClashCheck = () => {
+    toast.success(`Clash check complete — ${clashes.length} clash${clashes.length === 1 ? "" : "es"} (${critical} critical)`);
+    showIssues("clashes");
+  };
+  const saveNote = () => {
+    if (!selection || !noteText.trim()) return;
+    addAnnotation({
+      modelId: model.id, elementId: selection.id, elementLabel: selection.label, level: selection.level, text: noteText.trim(),
+      author: profile?.display_name || user?.email?.split("@")[0] || "You",
+    });
+    setNoteText("");
+    refreshNotes();
+    toast.success("Note pinned to element");
+  };
+  const focusNote = (n: Annotation) => {
+    const [key] = n.elementId.split("#");
+    const discipline = (["ducts", "plant"].includes(key) ? "hvac" : key === "trays" ? "electrical" : key === "risers" ? "plumbing" : ["slabs", "roof", "columns", "core"].includes(key) ? "structural" : ["pad", "paving", "road", "trunks", "canopies", "green"].includes(key) ? "site" : "architectural") as Discipline;
+    setSelection({ id: n.elementId, label: n.elementLabel, level: n.level, discipline });
+    frame.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   const toggleLayer = (i: number) => setLayers((prev) => prev.map((l, idx) => (idx === i ? { ...l, visible: !l.visible } : l)));
   const setAll = (visible: boolean) => setLayers((prev) => prev.map((l) => ({ ...l, visible })));
@@ -201,7 +250,7 @@ export default function ViewerPage() {
                 {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.generated ? `✦ ${m.name}` : m.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => navigate("/spatial/clash")}>
+            <Button variant="outline" onClick={runClashCheck}>
               <ShieldAlert /> Run clash check
             </Button>
           </>
@@ -318,11 +367,22 @@ export default function ViewerPage() {
                     <dd className={cn("truncate text-right", k === "Element ID" && "ss-num")}>{v}</dd>
                   </div>
                 ))}
-                <div className="flex gap-2 pt-2">
-                  <Button size="xs" variant="outline" className="flex-1" onClick={() => navigate("/build/rfis")}>
-                    <MessageSquareText /> Raise RFI
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => setSelection(null)}>Clear</Button>
+                <div className="space-y-2 pt-2">
+                  <Textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveNote(); }}
+                    placeholder="Add a note to this element…"
+                    rows={2}
+                    className="min-h-[56px] resize-none text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="xs" className="flex-1" onClick={saveNote} disabled={!noteText.trim()}>
+                      <MessageSquareText /> Pin note
+                    </Button>
+                    <Button size="xs" variant="outline" onClick={() => navigate("/build/rfis")}>Raise RFI</Button>
+                    <Button size="xs" variant="ghost" onClick={() => setSelection(null)}>Clear</Button>
+                  </div>
                 </div>
               </dl>
             ) : (
@@ -356,9 +416,71 @@ export default function ViewerPage() {
       <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Total elements" value={totalElements.toLocaleString()} icon={Box} hint={`${model.format} · ${model.spec.use}`} />
         <StatCard label="Visible in view" value={visibleElements.toLocaleString()} icon={Eye} hint={`${visibleCount} of ${layers.length} layers`} tone="data" />
-        <StatCard label="Clash issues" value="12" icon={AlertTriangle} hint="3 critical" tone="warning" onClick={() => navigate("/spatial/clash")} />
-        <StatCard label="Annotations" value="34" icon={MessageSquareText} hint="8 unresolved" />
+        <StatCard label="Clash issues" value={clashes.length} icon={AlertTriangle} hint={`${critical} critical`} tone={critical ? "warning" : clashes.length ? "default" : "success"} onClick={() => showIssues("clashes")} />
+        <StatCard label="Annotations" value={notes.length} icon={MessageSquareText} hint={notes.length ? `${openNotes} unresolved` : "Pin notes from the inspector"} onClick={() => showIssues("notes")} />
       </section>
+
+      <div ref={issuesRef} className="scroll-mt-20">
+        <Panel
+          flush
+          eyebrow="Coordination"
+          title={model.name}
+          actions={
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "clashes" | "notes")}>
+              <TabsList>
+                <TabsTrigger value="clashes">Clashes <span className="ss-num text-[10.5px] text-muted-foreground">{clashes.length}</span></TabsTrigger>
+                <TabsTrigger value="notes">Notes <span className="ss-num text-[10.5px] text-muted-foreground">{notes.length}</span></TabsTrigger>
+              </TabsList>
+            </Tabs>
+          }
+        >
+          {tab === "clashes" ? (
+            clashes.length === 0 ? (
+              <div className="p-5 pt-0"><EmptyState compact icon={ShieldAlert} title="No clashes" description="MEP runs clear the structure on every level." /></div>
+            ) : (
+              <ul className="max-h-[420px] divide-y divide-border/70 overflow-y-auto border-t">
+                {clashes.slice(0, 80).map((c) => (
+                  <li key={c.id}>
+                    <button
+                      onClick={() => focusClash(c)}
+                      className={cn("grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-5 py-2.5 text-left transition-colors hover:bg-surface-2/60", selection?.id === c.a.id && "bg-primary/[0.06]")}
+                    >
+                      <StatusPill status={c.severity} tone={c.severity === "critical" ? "destructive" : c.severity === "major" ? "warning" : "neutral"} className="capitalize" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px]">{c.description}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{c.a.label} × {c.b.label}</span>
+                      </span>
+                      <span className="ss-num shrink-0 text-[11px] text-muted-foreground">{c.a.level}</span>
+                    </button>
+                  </li>
+                ))}
+                {clashes.length > 80 && <li className="px-5 py-2.5 text-xs text-muted-foreground">+ {clashes.length - 80} more</li>}
+              </ul>
+            )
+          ) : notes.length === 0 ? (
+            <div className="p-5 pt-0"><EmptyState compact icon={MessageSquareText} title="No notes yet" description="Select an element in the viewport, then pin a note to it from the inspector." /></div>
+          ) : (
+            <ul className="divide-y divide-border/70 border-t">
+              {notes.map((n) => (
+                <li key={n.id} className="flex items-start gap-3 px-5 py-3">
+                  <button onClick={() => focusNote(n)} className="min-w-0 flex-1 text-left">
+                    <p className={cn("text-[13px]", n.resolved && "text-muted-foreground line-through")}>{n.text}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {n.elementLabel} · {n.level} · {n.author} · <span className="ss-num">{new Date(n.createdAt).toLocaleDateString()}</span>
+                    </p>
+                  </button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={n.resolved ? "Reopen note" : "Resolve note"} onClick={() => { updateAnnotation(n.id, { resolved: !n.resolved }); refreshNotes(); }}>
+                    {n.resolved ? <Undo2 /> : <Check />}
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete note" onClick={() => { removeAnnotation(n.id); refreshNotes(); }}>
+                    <Trash2 />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }

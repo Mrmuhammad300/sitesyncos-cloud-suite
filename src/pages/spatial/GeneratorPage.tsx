@@ -1,7 +1,17 @@
 import { Suspense, useDeferredValue, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { Download, FolderOpen, History, Layers, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { Check, Download, FolderOpen, History, Layers, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import type * as THREE from "three";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCreateDocument } from "@/hooks/useOpsData";
+import { useCreateFloorPlanVariants } from "@/hooks/useBlenderData";
+import { useAuth } from "@/hooks/useAuth";
+import { designVariants, type DesignVariant } from "@/lib/spatial/designEdits";
+import { planVariantsFromSpec } from "@/lib/spatial/floorPlan";
+import { downloadBlob, exportGlb, slugify } from "@/lib/spatial/exportGlb";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -89,7 +99,84 @@ export default function GeneratorPage() {
   const ready = status === "completed";
   const deferredPrompt = useDeferredValue(prompt);
   // The active job's prompt wins once submitted, so editing the box doesn't morph the result.
-  const spec = useMemo(() => specFromPrompt(activeJob?.prompt ?? deferredPrompt), [activeJob?.prompt, deferredPrompt]);
+  const baseSpec = useMemo(() => specFromPrompt(activeJob?.prompt ?? deferredPrompt), [activeJob?.prompt, deferredPrompt]);
+  const [variants, setVariants] = useState<DesignVariant[] | null>(null);
+  const [variantKey, setVariantKey] = useState<string>("base");
+  const variant = variants?.find((v) => v.key === variantKey) ?? null;
+  const spec = variant?.spec ?? baseSpec;
+  const scene = useRef<THREE.Scene | null>(null);
+  const navigate = useNavigate();
+  const { profile, user } = useAuth();
+  const createDocument = useCreateDocument();
+  const createPlans = useCreateFloorPlanVariants();
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveProject, setSaveProject] = useState<string>("none");
+
+  /** The rendered building as a .glb — the job's own file when it produced one. */
+  const modelBlob = async (): Promise<Blob> => {
+    const url = activeJob?.result_url;
+    if (!variant && isRenderableModel(url)) {
+      const res = await fetch(url);
+      if (res.ok) return res.blob();
+    }
+    const obj = scene.current?.getObjectByName("building");
+    if (!obj) throw new Error("The model is still loading — try again in a moment.");
+    return exportGlb(obj);
+  };
+
+  const run = async (key: string, fn: () => Promise<void>) => {
+    setBusyAction(key);
+    try {
+      await fn();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleExport = () => run("export", async () => {
+    const blob = await modelBlob();
+    downloadBlob(blob, `${slugify(spec.name)}.glb`);
+    toast.success(`Exported ${spec.name}.glb (${(blob.size / 1024 / 1024).toFixed(1)} MB)`);
+  });
+
+  const handleSave = () => run("save", async () => {
+    if (saveProject === "none") throw new Error("Choose a project to save the model to.");
+    const blob = await modelBlob();
+    const file = new File([blob], `${slugify(spec.name)}.glb`, { type: "model/gltf-binary" });
+    await createDocument.mutateAsync({
+      title: `${spec.name} — 3D model`,
+      doc_number: `MDL-${Date.now().toString().slice(-6)}`,
+      doc_type: "Model",
+      status: "Current",
+      version: 1,
+      project_id: saveProject,
+      description: spec.prompt,
+      uploaded_by: profile?.display_name || user?.email || null,
+      file,
+    });
+    setSaveOpen(false);
+    const project = projects?.find((p) => p.id === saveProject);
+    toast.success(`Saved to ${project?.name ?? "project"}`, { action: { label: "View documents", onClick: () => navigate("/ops/documents") } });
+  });
+
+  const handleSendToPlans = () => run("plans", async () => {
+    const plans = planVariantsFromSpec(spec).map((v) => ({
+      ...v,
+      project_id: projectId !== "none" ? projectId : null,
+      blender_job_id: activeJobId,
+    }));
+    await createPlans.mutateAsync(plans);
+    navigate("/spatial/plans");
+  });
+
+  const handleVariants = () => {
+    setVariants(designVariants(baseSpec));
+    setVariantKey("A");
+    toast.success("3 design variants ready — compare them below the viewer.");
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -99,6 +186,8 @@ export default function GeneratorPage() {
       project_id: projectId !== "none" ? projectId : undefined,
     });
     setActiveJobId(job.id);
+    setVariants(null);
+    setVariantKey("base");
   };
 
   const step = !activeJobId ? (prompt.trim() ? 1 : 0) : ready ? 2 : 1;
@@ -211,9 +300,9 @@ export default function GeneratorPage() {
               </>
             }
           >
-            <Canvas shadows dpr={[1, 2]} aria-label="Generated model preview">
+            <Canvas shadows dpr={[1, 2]} aria-label="Generated model preview" onCreated={({ scene: s }) => { scene.current = s; }}>
               <Suspense fallback={<SceneFallback />}>
-                <GeneratedScene palette={palette} spec={spec} status={status} fileUrl={activeJob?.result_url} />
+                <GeneratedScene palette={palette} spec={spec} status={status} fileUrl={variant ? null : activeJob?.result_url} />
                 <CameraProbe target={probe} />
               </Suspense>
             </Canvas>
@@ -235,21 +324,50 @@ export default function GeneratorPage() {
             ))}
           </dl>
 
+          {variants && (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[{ key: "base", label: "Original", summary: baseSpec.prompt, spec: baseSpec } as DesignVariant, ...variants].map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setVariantKey(v.key)}
+                  aria-pressed={variantKey === v.key}
+                  className={cn(
+                    "ss-card ss-interactive space-y-1.5 p-3 text-left",
+                    variantKey === v.key && "border-mod-spatial/50 shadow-[0_0_0_1px_hsl(var(--mod-spatial)/0.4)]",
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[13px] font-medium">
+                      <span className="ss-num flex h-5 w-5 items-center justify-center rounded border text-[10px] text-muted-foreground">{v.key === "base" ? "0" : v.key}</span>
+                      {v.label}
+                    </span>
+                    {variantKey === v.key && <Check className="h-3.5 w-3.5 text-mod-spatial" />}
+                  </span>
+                  <span className="ss-num block text-[11px] text-muted-foreground">
+                    {v.spec.floors + v.spec.podiumFloors} st · {buildingHeight(v.spec).toFixed(0)} m · {grossFloorArea(v.spec).toLocaleString()} m²
+                  </span>
+                  <span className="line-clamp-2 block text-[11.5px] text-muted-foreground">{v.summary}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
             {[
-              { icon: Download, label: "Export GLB", desc: "Download 3D file" },
-              { icon: FolderOpen, label: "Save to project", desc: "Attach to project" },
-              { icon: Layers, label: "Send to Floor Plans", desc: "Extract 2D layout" },
-              { icon: RefreshCw, label: "Generate variants", desc: "3 alternative layouts" },
-            ].map(({ icon: Icon, label, desc }) => (
+              { key: "export", icon: Download, label: "Export GLB", desc: "Download the 3D file", onClick: handleExport },
+              { key: "save", icon: FolderOpen, label: "Save to project", desc: "File it under Documents", onClick: () => { setSaveProject(projectId); setSaveOpen(true); } },
+              { key: "plans", icon: Layers, label: "Send to Floor Plans", desc: "3 typical-floor options", onClick: handleSendToPlans },
+              { key: "variants", icon: RefreshCw, label: variants ? "Regenerate variants" : "Generate variants", desc: "3 alternative designs", onClick: handleVariants },
+            ].map(({ key, icon: Icon, label, desc, onClick }) => (
               <button
-                key={label}
-                disabled={!ready}
+                key={key}
+                onClick={onClick}
+                disabled={!ready || busyAction !== null}
                 title={ready ? label : "Available once a model is generated"}
                 className="ss-card ss-interactive group flex items-center gap-3 p-3 text-left disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:shadow-none"
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface-2 text-muted-foreground group-enabled:group-hover:text-mod-spatial">
-                  <Icon className="h-4 w-4" />
+                  {busyAction === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-medium">{label}</span>
@@ -258,6 +376,30 @@ export default function GeneratorPage() {
               </button>
             ))}
           </div>
+
+          <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Save model to a project</DialogTitle>
+                <DialogDescription>
+                  {spec.name} is exported as a .glb and filed in the project's documents, so the whole team can open it.
+                </DialogDescription>
+              </DialogHeader>
+              <Select value={saveProject} onValueChange={setSaveProject}>
+                <SelectTrigger aria-label="Project to save to"><SelectValue placeholder="Choose a project" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" disabled>Choose a project</SelectItem>
+                  {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSaveOpen(false)}>Cancel</Button>
+                <Button onClick={handleSave} disabled={saveProject === "none" || busyAction === "save"}>
+                  {busyAction === "save" ? <Loader2 className="animate-spin" /> : <FolderOpen />} Save model
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
