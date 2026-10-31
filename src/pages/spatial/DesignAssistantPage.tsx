@@ -1,19 +1,18 @@
 import { useState, useRef, useEffect, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment, PerspectiveCamera, Html } from "@react-three/drei";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Edges, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import * as THREE from "three";
+import { ArrowUp, GitBranch, History, Lightbulb, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, Loader2, Bot, User, CheckCircle2, XCircle, RotateCcw, GitBranch, Lightbulb } from "lucide-react";
+import { BrandMark, EmptyState, PageHeader, Panel, StatusPill } from "@/components/os";
 import { useProjects } from "@/hooks/useProjectData";
 import { useBlenderJobs, useCreateBlenderJob, useBlenderJobStatus } from "@/hooks/useBlenderData";
-import { toast } from "sonner";
-import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
-import { useRef as useThreeRef } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { mix, useScenePalette, type ScenePalette } from "@/components/spatial/sceneTheme";
+import { AxisGizmo, Readout, SceneFallback, SceneGrid, SceneLights, Viewport, ViewportSlot } from "@/components/spatial/Viewport";
+import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,95 +36,89 @@ const DESIGN_SUGGESTIONS = [
 
 // ─── 3D Scene (evolves with design iterations) ────────────────────────────────
 
-function DesignScene({ iteration }: { iteration: number }) {
-  const groupRef = useThreeRef<THREE.Group>(null);
+const ITER_TONES = ["spatial", "data", "primary", "vault", "success"] as const;
+
+function DesignScene({ iteration, palette }: { iteration: number; palette: ScenePalette }) {
+  const groupRef = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
     if (groupRef.current) {
       groupRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.15) * 0.1;
     }
   });
 
-  const hue = (iteration * 40) % 360;
-  const color = `hsl(${hue}, 70%, 55%)`;
+  const color = palette[ITER_TONES[iteration % ITER_TONES.length]];
+  const walls: { pos: [number, number, number]; args: [number, number, number] }[] = [
+    { pos: [0, 1.5, 3], args: [8, 3, 0.1] },
+    { pos: [0, 1.5, -3], args: [8, 3, 0.1] },
+    { pos: [4, 1.5, 0], args: [0.1, 3, 6] },
+    { pos: [-4, 1.5, 0], args: [0.1, 3, 6] },
+  ];
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[10, 8, 10]} fov={45} />
-      <OrbitControls enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 15, 10]} intensity={1} />
-      <Grid args={[24, 24]} cellColor="#334155" sectionColor="#475569" />
+      <PerspectiveCamera makeDefault position={[11, 9, 13]} fov={40} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} target={[0, 1, 0]} />
+      <SceneLights palette={palette} />
+      <SceneGrid palette={palette} size={28} />
       <group ref={groupRef}>
-        {/* Floor */}
-        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[8, 6]} />
-          <meshStandardMaterial color="#1e293b" />
+          <meshStandardMaterial color={mix(palette.canvas, palette.foreground, palette.dark ? 0.1 : 0.06)} />
         </mesh>
-        {/* Walls */}
-        {[
-          { pos: [0, 1.5, 3] as [number, number, number], args: [8, 3, 0.1] as [number, number, number] },
-          { pos: [0, 1.5, -3] as [number, number, number], args: [8, 3, 0.1] as [number, number, number] },
-          { pos: [4, 1.5, 0] as [number, number, number], args: [0.1, 3, 6] as [number, number, number] },
-          { pos: [-4, 1.5, 0] as [number, number, number], args: [0.1, 3, 6] as [number, number, number] },
-        ].map((w, i) => (
+        {walls.map((w, i) => (
           <mesh key={i} position={w.pos}>
             <boxGeometry args={w.args} />
-            <meshStandardMaterial color={color} transparent opacity={0.3} />
+            <meshStandardMaterial color={color} transparent opacity={0.22} />
+            <Edges color={color} />
           </mesh>
         ))}
-        {/* Interior partitions — shift per iteration */}
         {iteration > 0 && (
           <mesh position={[0, 1.5, iteration % 2 === 0 ? 1 : -1]}>
             <boxGeometry args={[4, 3, 0.1]} />
-            <meshStandardMaterial color="#64748b" transparent opacity={0.6} />
+            <meshStandardMaterial color={palette.concrete} transparent opacity={0.6} />
           </mesh>
         )}
-        {/* Furniture dots */}
         {Array.from({ length: 6 + iteration * 2 }).map((_, i) => (
-          <mesh key={`f${i}`} position={[
-            Math.cos(i * 1.1) * (2 + (i % 2)),
-            0.4,
-            Math.sin(i * 1.1) * 1.5,
-          ]}>
-            <cylinderGeometry args={[0.2, 0.2, 0.8, 6]} />
-            <meshStandardMaterial color={color} />
+          <mesh key={`f${i}`} castShadow position={[Math.cos(i * 1.1) * (2 + (i % 2)), 0.4, Math.sin(i * 1.1) * 1.5]}>
+            <cylinderGeometry args={[0.2, 0.2, 0.8, 12]} />
+            <meshStandardMaterial color={color} roughness={0.5} />
           </mesh>
         ))}
       </group>
-      {iteration > 0 && (
-        <Html position={[0, 5, 0]}>
-          <div className="text-[9px] bg-background/90 border border-border px-2 py-1 rounded whitespace-nowrap text-center">
-            Iteration {iteration}
-          </div>
-        </Html>
-      )}
-      <Environment preset="city" />
+      <AxisGizmo palette={palette} />
     </>
   );
 }
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, initials }: { message: Message; initials: string }) {
   const isUser = message.role === "user";
+  const live = message.status === "processing" || message.status === "pending";
   return (
-    <div className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-primary" : "bg-muted"}`}>
-        {isUser ? <User className="h-3.5 w-3.5 text-primary-foreground" /> : <Bot className="h-3.5 w-3.5 text-muted-foreground" />}
-      </div>
-      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs ${isUser ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
-        <p>{message.content}</p>
-        {message.status && message.status !== "completed" && (
-          <div className="flex items-center gap-1 mt-1 opacity-70">
-            {message.status === "processing" || message.status === "pending"
-              ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              : message.status === "failed"
-              ? <XCircle className="h-2.5 w-2.5" />
-              : null}
-            <span className="text-[9px]">{message.status}</span>
-          </div>
-        )}
-        <p className={`text-[9px] mt-1 opacity-50 ${isUser ? "text-right" : ""}`}>
+    <div className={cn("flex gap-2.5 animate-fade-in", isUser ? "flex-row-reverse" : "flex-row")}>
+      {isUser ? (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-surface-3 font-mono text-[10px] font-medium">{initials}</span>
+      ) : (
+        <BrandMark className="h-7 w-7 shrink-0" />
+      )}
+      <div className={cn("min-w-0 max-w-[85%] space-y-1", isUser && "items-end text-right")}>
+        <div
+          className={cn(
+            "inline-block rounded-2xl px-3.5 py-2.5 text-left text-[13px] leading-relaxed",
+            isUser ? "rounded-tr-md border border-primary/20 bg-primary/10" : "rounded-tl-md border bg-surface-2",
+          )}
+        >
+          {message.content}
+          {message.status && message.status !== "completed" && (
+            <div className="mt-2">
+              <StatusPill status={message.status} pulse={live} className="capitalize">
+                {live ? "Blender working" : message.status === "failed" ? <><XCircle className="h-3 w-3" /> failed</> : message.status}
+              </StatusPill>
+            </div>
+          )}
+        </div>
+        <p className="ss-num px-1 text-[10px] text-muted-foreground">
           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
@@ -154,6 +147,10 @@ export default function DesignAssistantPage() {
   const { data: jobs } = useBlenderJobs(projectId !== "none" ? projectId : undefined);
   const createJob = useCreateBlenderJob();
   const { data: activeJob } = useBlenderJobStatus(activeJobId);
+  const palette = useScenePalette();
+  const { profile, user } = useAuth();
+  const initials = (profile?.display_name || user?.email || "You").split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+  const busy = activeJob?.status === "pending" || activeJob?.status === "processing";
 
   // Auto-scroll chat
   useEffect(() => {
@@ -252,142 +249,128 @@ export default function DesignAssistantPage() {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Design Assistant</h1>
-            <Badge variant="outline" className="text-[10px]">Spatial Workbench</Badge>
-            <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/20 border">Blender MCP</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Iteratively refine 3D designs through natural language conversation.
-          </p>
-        </div>
-        <Select value={projectId} onValueChange={setProjectId}>
-          <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Link project" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No project</SelectItem>
-            {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Design Assistant"
+        description="Iterate on a 3D design in conversation — each request becomes a Blender job and a new version of the model."
+        actions={
+          <>
+            <StatusPill status="Blender MCP" tone="data" pulse />
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger className="w-full sm:w-[220px]" aria-label="Project"><SelectValue placeholder="Link project" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No project</SelectItem>
+                {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4" style={{ height: "calc(100vh - 220px)" }}>
-        {/* Chat panel */}
-        <div className="lg:col-span-2 flex flex-col gap-3">
-          <Card className="flex-1 flex flex-col overflow-hidden">
-            <CardHeader className="pb-2 shrink-0">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-blue-500" />
-                Design Chat
-                {iteration > 0 && (
-                  <Badge variant="outline" className="text-[10px] ml-auto">Iteration {iteration}</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-              {/* Messages */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
-              </div>
-
-              {/* Suggestions */}
-              {messages.length <= 2 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                    <Lightbulb className="h-3 w-3" /> Try asking
-                  </p>
-                  {DESIGN_SUGGESTIONS.slice(0, 3).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setInput(s)}
-                      className="w-full text-left text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      {s}
-                    </button>
+      <div className="grid gap-4 lg:h-[calc(100svh-250px)] lg:min-h-[560px] lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        {/* Viewport (first on mobile) */}
+        <Viewport
+          className="order-first h-[340px] sm:h-[420px] lg:order-last lg:h-full"
+          overlay={
+            <>
+              <ViewportSlot at="top-left">
+                <Readout className="text-foreground">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", busy ? "animate-pulse bg-primary" : "bg-success")} />
+                  {busy ? "Rebuilding…" : iteration > 0 ? `Iteration ${iteration}` : "Base design"}
+                </Readout>
+              </ViewportSlot>
+              <ViewportSlot at="bottom-left">
+                <div className="flex items-center gap-1 rounded-lg border border-border/80 bg-background/75 px-2 py-1.5 backdrop-blur-md" aria-label="Version timeline">
+                  {Array.from({ length: Math.max(iteration + 1, 1) }).map((_, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      {i > 0 && <span className="h-px w-3 bg-border-strong" />}
+                      <span className={cn("ss-num flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px]", i === iteration ? "bg-mod-spatial text-background" : "text-muted-foreground")}>v{i}</span>
+                    </span>
                   ))}
                 </div>
-              )}
+              </ViewportSlot>
+            </>
+          }
+        >
+          <Canvas shadows dpr={[1, 2]} aria-label="Design model">
+            <Suspense fallback={<SceneFallback />}>
+              <DesignScene iteration={iteration} palette={palette} />
+            </Suspense>
+          </Canvas>
+        </Viewport>
 
-              {/* Input */}
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Describe a design change…"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  rows={2}
-                  className="text-xs resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                  }}
-                />
-                <Button size="icon" onClick={handleSend} disabled={!input.trim() || createJob.isPending} className="shrink-0 self-end">
-                  {createJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+        {/* Chat */}
+        <section className="ss-card flex h-[560px] min-h-0 flex-col lg:h-full">
+          <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="min-w-0">
+              <p className="ss-eyebrow">Conversation</p>
+              <h2 className="text-[14px] font-semibold">Design chat</h2>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="ss-num mr-1 rounded-md border bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-muted-foreground">ITER {String(iteration).padStart(2, "0")}</span>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleUndo} disabled={iteration === 0} title="Undo iteration" aria-label="Undo iteration"><RotateCcw /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" disabled={iteration === 0} title="Branch variant" aria-label="Branch variant"><GitBranch /></Button>
+            </div>
+          </header>
+
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {messages.map((m) => <MessageBubble key={m.id} message={m} initials={initials} />)}
+          </div>
+
+          <div className="space-y-2.5 border-t p-3">
+            {messages.length <= 2 && (
+              <div className="flex flex-wrap gap-1.5">
+                <Lightbulb className="mt-1 h-3.5 w-3.5 text-muted-foreground" />
+                {DESIGN_SUGGESTIONS.slice(0, 3).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setInput(s)}
+                    className="rounded-full border px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Iteration controls */}
-          <Card>
-            <CardContent className="p-3 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={handleUndo} disabled={iteration === 0}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Undo
+            )}
+            <div className="relative rounded-xl border bg-surface-2/50 transition-[border-color,box-shadow] focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]">
+              <Textarea
+                placeholder="Describe a design change…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                rows={2}
+                className="min-h-[64px] resize-none border-0 bg-transparent pr-12 text-[13px] shadow-none focus-visible:ring-0"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
+              />
+              <Button size="icon" onClick={handleSend} disabled={!input.trim() || createJob.isPending} className="absolute bottom-2 right-2 h-8 w-8" aria-label="Send">
+                {createJob.isPending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 text-xs" disabled={iteration === 0}>
-                <GitBranch className="h-3.5 w-3.5 mr-1.5" /> Branch Variant
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 3D canvas */}
-        <div className="lg:col-span-3">
-          <Card className="h-full">
-            <CardContent className="p-0 h-full">
-              <div className="h-full min-h-[400px] rounded-lg overflow-hidden bg-muted/20 relative">
-                <Canvas shadows>
-                  <Suspense fallback={<Html center><div className="text-xs text-muted-foreground">Loading…</div></Html>}>
-                    <DesignScene iteration={iteration} />
-                  </Suspense>
-                </Canvas>
-                {iteration > 0 && (
-                  <div className="absolute top-3 left-3 bg-background/80 backdrop-blur rounded-full px-3 py-1 text-xs font-medium border">
-                    Iteration {iteration}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <p className="hidden text-[10.5px] text-muted-foreground sm:block"><kbd className="ss-kbd">↵</kbd> send · <kbd className="ss-kbd">Shift</kbd>+<kbd className="ss-kbd">↵</kbd> new line</p>
+          </div>
+        </section>
       </div>
 
       {/* History */}
-      {jobs && jobs.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Design History ({jobs.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {jobs.map((job, i) => (
-                <div key={job.id} className="shrink-0 w-32 border rounded-lg p-2 text-center space-y-1 hover:border-primary/50 cursor-pointer transition-colors">
-                  <div className="aspect-square bg-muted/30 rounded flex items-center justify-center">
-                    <span className="text-lg font-bold text-muted-foreground">{jobs.length - i}</span>
-                  </div>
-                  <p className="text-[9px] text-muted-foreground truncate">{job.prompt ?? "Design iterate"}</p>
-                  <Badge variant="outline" className={`text-[9px] w-full justify-center ${
-                    job.status === "completed" ? "border-emerald-500/30 text-emerald-600" :
-                    job.status === "failed" ? "border-destructive/30 text-destructive" :
-                    "border-amber-500/30 text-amber-600"
-                  }`}>{job.status}</Badge>
+      <Panel eyebrow="Versions" title={<span className="flex items-center gap-2">Design history {jobs && jobs.length > 0 && <span className="ss-num text-xs font-normal text-muted-foreground">{jobs.length}</span>}</span>}>
+        {jobs && jobs.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {jobs.map((job, i) => (
+              <article key={job.id} className="ss-card ss-interactive w-40 shrink-0 cursor-pointer space-y-2 p-2.5">
+                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border bg-surface-2/60">
+                  <div className="ss-blueprint absolute inset-0 opacity-70" />
+                  <span className="ss-num relative text-2xl text-muted-foreground">v{jobs.length - i}</span>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <p className="truncate text-[11.5px]">{job.prompt ?? "Design iterate"}</p>
+                <StatusPill status={job.status} className="capitalize" pulse={job.status === "processing"} />
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState compact icon={History} title="No saved versions yet" description="Each request you send is stored as a version you can return to." />
+        )}
+      </Panel>
     </div>
   );
 }

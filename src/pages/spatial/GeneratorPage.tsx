@@ -1,18 +1,19 @@
-import { useState, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment, PerspectiveCamera, Html } from "@react-three/drei";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Suspense, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Edges, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import * as THREE from "three";
+import { Download, FolderOpen, History, Layers, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Wand2, Loader2, CheckCircle2, XCircle, Clock, Activity, Download, FolderOpen, Layers, RefreshCw } from "lucide-react";
+import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/os";
 import { useProjects } from "@/hooks/useProjectData";
-import { useBlenderJobs, useCreateBlenderJob, useBlenderJobStatus } from "@/hooks/useBlenderData";
-import * as THREE from "three";
-import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useBlenderJobs, useCreateBlenderJob, useBlenderJobStatus, type BlenderJobStatus } from "@/hooks/useBlenderData";
+import { useScenePalette, type ScenePalette } from "@/components/spatial/sceneTheme";
+import { AxisGizmo, CameraProbe, Readout, SceneFallback, SceneGrid, SceneLights, Viewport, ViewportSlot } from "@/components/spatial/Viewport";
+import { JobProgress } from "@/components/spatial/JobProgress";
+import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
   "Modern open-plan office, 5,000 sqft, 30 desks, 3 meeting rooms, kitchen",
@@ -22,54 +23,43 @@ const SUGGESTIONS = [
   "Medical clinic, 3,200 sqft, 6 exam rooms, waiting area, nurses station",
 ];
 
-function PlaceholderScene() {
-  const meshRef = useRef<THREE.Mesh>(null);
+const SHORT = ["Open-plan office", "3-bed residence", "Retail showroom", "Mixed-use lobby", "Medical clinic"];
+
+/** Massing study that "assembles" while a job is running and settles when ready. */
+function PlaceholderScene({ palette, status }: { palette: ScenePalette; status: BlenderJobStatus | null }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const live = status === "pending" || status === "processing";
   useFrame(({ clock }) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = clock.getElapsedTime() * 0.4;
-    }
+    if (groupRef.current) groupRef.current.rotation.y = clock.getElapsedTime() * (live ? 0.6 : 0.15);
   });
+  const ready = status === "completed";
+  const blocks: [number, number, number, number, number, number][] = [
+    [0, 1.5, 0, 4, 3, 3],
+    [-1, 3.75, 0.25, 2, 1.5, 2.5],
+    [1.25, 3.4, -0.5, 1.5, 0.8, 2],
+  ];
   return (
     <>
-      <PerspectiveCamera makeDefault position={[8, 6, 8]} fov={45} />
-      <OrbitControls enableDamping dampingFactor={0.1} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 15, 10]} intensity={1} />
-      <Grid args={[20, 20]} cellColor="#334155" sectionColor="#475569" />
-      <mesh ref={meshRef} position={[0, 1.5, 0]}>
-        <boxGeometry args={[3, 3, 3]} />
-        <meshStandardMaterial color="#3b82f6" wireframe />
-      </mesh>
-      <Html center position={[0, 4, 0]}>
-        <div className="text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded whitespace-nowrap">
-          Generated model will appear here
-        </div>
-      </Html>
-      <Environment preset="city" />
+      <PerspectiveCamera makeDefault position={[9, 7, 9]} fov={42} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} target={[0, 2, 0]} />
+      <SceneLights palette={palette} />
+      <SceneGrid palette={palette} size={28} />
+      <group ref={groupRef}>
+        {blocks.map(([x, y, z, w, h, d], i) => (
+          <mesh key={i} position={[x, y, z]} castShadow>
+            <boxGeometry args={[w, h, d]} />
+            <meshStandardMaterial
+              color={ready ? (i === 0 ? palette.slab : palette.spatial) : palette.spatial}
+              transparent
+              opacity={ready ? 0.9 : 0.08}
+              roughness={0.6}
+            />
+            <Edges color={ready ? palette.foreground : live ? palette.primary : palette.spatial} threshold={15} />
+          </mesh>
+        ))}
+      </group>
+      <AxisGizmo palette={palette} />
     </>
-  );
-}
-
-const statusIcon: Record<string, React.ReactNode> = {
-  completed: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
-  failed: <XCircle className="h-3.5 w-3.5 text-destructive" />,
-  pending: <Clock className="h-3.5 w-3.5 text-amber-500" />,
-  processing: <Activity className="h-3.5 w-3.5 text-blue-500 animate-pulse" />,
-};
-
-const statusVariant: Record<string, string> = {
-  completed: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  failed: "bg-destructive/10 text-destructive border-destructive/20",
-  pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  processing: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-};
-
-function JobStatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] border rounded-full px-2 py-0.5 ${statusVariant[status] ?? ""}`}>
-      {statusIcon[status]}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
   );
 }
 
@@ -77,26 +67,13 @@ function ActiveJobMonitor({ jobId }: { jobId: string }) {
   const { data: job } = useBlenderJobStatus(jobId);
   if (!job) return null;
   return (
-    <Card className="border-blue-500/30 bg-blue-500/5">
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {job.status === "processing" || job.status === "pending"
-            ? <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-            : job.status === "completed"
-            ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            : <XCircle className="h-4 w-4 text-destructive" />}
-          <div>
-            <p className="text-xs font-medium">
-              {job.status === "pending" ? "Job queued…" :
-               job.status === "processing" ? "Blender generating model…" :
-               job.status === "completed" ? "Model ready!" : "Generation failed"}
-            </p>
-            <p className="text-[10px] text-muted-foreground">Job #{job.id.slice(0, 8)}</p>
-          </div>
-        </div>
-        <JobStatusBadge status={job.status} />
-      </CardContent>
-    </Card>
+    <JobProgress
+      floating
+      status={job.status}
+      jobId={job.id}
+      error={job.error_message}
+      copy={{ pending: "Job queued…", processing: "Blender generating model…", completed: "Model ready!", failed: "Generation failed" }}
+    />
   );
 }
 
@@ -104,10 +81,15 @@ export default function GeneratorPage() {
   const [prompt, setPrompt] = useState("");
   const [projectId, setProjectId] = useState<string>("none");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const palette = useScenePalette();
+  const probe = useRef<HTMLSpanElement>(null);
 
   const { data: projects } = useProjects();
-  const { data: jobs } = useBlenderJobs(projectId !== "none" ? projectId : undefined);
+  const { data: jobs, isLoading: jobsLoading } = useBlenderJobs(projectId !== "none" ? projectId : undefined);
+  const { data: activeJob } = useBlenderJobStatus(activeJobId);
   const createJob = useCreateBlenderJob();
+  const status = activeJob?.status ?? null;
+  const ready = status === "completed";
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -119,170 +101,187 @@ export default function GeneratorPage() {
     setActiveJobId(job.id);
   };
 
+  const step = !activeJobId ? (prompt.trim() ? 1 : 0) : ready ? 2 : 1;
+
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">3D Generator</h1>
-            <Badge variant="outline" className="text-[10px]">Spatial Workbench</Badge>
-            <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/20 border">Blender MCP</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Describe a space and AI generates a 3D model via Blender.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="3D Generator"
+        description="Describe a space in plain language — Blender builds a coordinated 3D model you can export or send to Floor Plans."
+        actions={<StatusPill status="Blender MCP" tone="data" pulse />}
+      >
+        <ol className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {["Describe", "Generate", "Review"].map((s, i) => (
+            <li key={s} className="flex items-center gap-2">
+              <span className={cn("ss-num flex h-5 w-5 items-center justify-center rounded-full border text-[10px]", i < step ? "border-mod-spatial bg-mod-spatial text-background" : i === step ? "border-mod-spatial text-mod-spatial" : "text-muted-foreground")}>
+                {i + 1}
+              </span>
+              <span className={cn("text-xs", i <= step ? "text-foreground" : "text-muted-foreground")}>{s}</span>
+              {i < 2 && <span className="hidden h-px w-8 bg-border sm:block" />}
+            </li>
+          ))}
+        </ol>
+      </PageHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Prompt panel */}
+      <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
+        {/* Prompt composer */}
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Wand2 className="h-4 w-4 text-blue-500" /> Generate from Prompt
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                placeholder="Describe the space you want to generate…"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={4}
-                className="text-sm resize-none"
-              />
-
-              {/* Quick suggestions */}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Quick start</p>
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setPrompt(s)}
-                    className="w-full text-left text-[10px] text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors truncate"
-                  >
-                    {s}
-                  </button>
-                ))}
+          <Panel glow eyebrow="Prompt" title="What should we build?">
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-surface-2/50 transition-[border-color,box-shadow] focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]">
+                <Textarea
+                  placeholder="e.g. Two-storey clinic, 3,200 sqft, six exam rooms around a daylit waiting area…"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleGenerate(); }}
+                  rows={5}
+                  className="resize-none border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+                />
+                <div className="flex items-center justify-between border-t px-3 py-2">
+                  <span className="ss-num text-[10.5px] text-muted-foreground">{prompt.length} chars</span>
+                  <span className="hidden items-center gap-1 text-[10.5px] text-muted-foreground sm:flex"><kbd className="ss-kbd">Ctrl</kbd><kbd className="ss-kbd">↵</kbd> generate</span>
+                </div>
               </div>
 
-              {/* Project link */}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Link to project (optional)</p>
+              <div className="space-y-2">
+                <p className="ss-eyebrow">Quick start</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SUGGESTIONS.map((s, i) => (
+                    <button
+                      key={s}
+                      title={s}
+                      onClick={() => setPrompt(s)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11.5px] transition-colors",
+                        prompt === s ? "border-mod-spatial/40 bg-mod-spatial/10 text-mod-spatial" : "text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground",
+                      )}
+                    >
+                      {SHORT[i]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="ss-eyebrow">Link to project</p>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No project" /></SelectTrigger>
+                  <SelectTrigger aria-label="Project"><SelectValue placeholder="No project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No project</SelectItem>
-                    {projects?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
+                    {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              <Button
-                className="w-full"
-                onClick={handleGenerate}
-                disabled={!prompt.trim() || createJob.isPending}
-              >
-                {createJob.isPending
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting…</>
-                  : <><Wand2 className="h-4 w-4 mr-2" /> Generate Model</>}
+              <Button size="lg" className="w-full" onClick={handleGenerate} disabled={!prompt.trim() || createJob.isPending}>
+                {createJob.isPending ? <><Loader2 className="animate-spin" /> Submitting…</> : <><Wand2 /> Generate model</>}
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Actions</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                { icon: Download, label: "Export GLB", desc: "Download 3D file" },
-                { icon: FolderOpen, label: "Save to Project", desc: "Attach to project" },
-                { icon: Layers, label: "Send to Floor Plans", desc: "Extract 2D layout" },
-                { icon: RefreshCw, label: "Generate Variants", desc: "3 alternative layouts" },
-              ].map(({ icon: Icon, label, desc }) => (
-                <button
-                  key={label}
-                  className="w-full flex items-center gap-3 p-2 rounded hover:bg-muted/50 text-left transition-colors"
-                >
-                  <div className="h-7 w-7 rounded bg-muted flex items-center justify-center shrink-0">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium">{label}</p>
-                    <p className="text-[10px] text-muted-foreground">{desc}</p>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
 
-        {/* 3D canvas */}
-        <div className="lg:col-span-2 space-y-4">
-          {activeJobId && <ActiveJobMonitor jobId={activeJobId} />}
+        {/* Result viewport */}
+        <div className="space-y-4">
+          <Viewport
+            className="h-[380px] sm:h-[460px] lg:h-[520px]"
+            overlay={
+              <>
+                <ViewportSlot at="top-left">
+                  <Readout className="text-foreground">
+                    <span className={cn("h-1.5 w-1.5 rounded-full", ready ? "bg-success" : status ? "animate-pulse bg-primary" : "bg-muted-foreground/50")} />
+                    {ready ? "Generated model" : status ? "Assembling massing" : "Preview · awaiting prompt"}
+                  </Readout>
+                </ViewportSlot>
+                <ViewportSlot at="bottom-left">
+                  <Readout><span className="text-mod-spatial">CAM</span><span ref={probe}>—</span></Readout>
+                </ViewportSlot>
+                {activeJobId ? (
+                  <div className="absolute inset-x-3 top-12 z-10 sm:left-auto sm:right-3 sm:top-3 sm:w-[340px]">
+                    <ActiveJobMonitor jobId={activeJobId} />
+                  </div>
+                ) : (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                    <div className="max-w-[260px] rounded-xl border border-border/80 bg-background/70 px-4 py-3 text-center backdrop-blur-md">
+                      <Sparkles className="mx-auto mb-1.5 h-4 w-4 text-mod-spatial" />
+                      <p className="text-[13px] font-medium">Your model will appear here</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Write a prompt, then generate.</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            }
+          >
+            <Canvas shadows dpr={[1, 2]} aria-label="Generated model preview">
+              <Suspense fallback={<SceneFallback />}>
+                <PlaceholderScene palette={palette} status={status} />
+                <CameraProbe target={probe} />
+              </Suspense>
+            </Canvas>
+          </Viewport>
 
-          <Card>
-            <CardContent className="p-0">
-              <div className="aspect-[16/9] rounded-lg overflow-hidden bg-muted/20">
-                <Canvas shadows>
-                  <Suspense fallback={<Html center><div className="text-xs text-muted-foreground">Loading…</div></Html>}>
-                    <PlaceholderScene />
-                  </Suspense>
-                </Canvas>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Layer toggles placeholder */}
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Model Layers</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">Generate a model to see layer controls.</p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
+            {[
+              { icon: Download, label: "Export GLB", desc: "Download 3D file" },
+              { icon: FolderOpen, label: "Save to project", desc: "Attach to project" },
+              { icon: Layers, label: "Send to Floor Plans", desc: "Extract 2D layout" },
+              { icon: RefreshCw, label: "Generate variants", desc: "3 alternative layouts" },
+            ].map(({ icon: Icon, label, desc }) => (
+              <button
+                key={label}
+                disabled={!ready}
+                title={ready ? label : "Available once a model is generated"}
+                className="ss-card ss-interactive group flex items-center gap-3 p-3 text-left disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:shadow-none"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface-2 text-muted-foreground group-enabled:group-hover:text-mod-spatial">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-medium">{label}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{desc}</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Job history */}
-      {jobs && jobs.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Generation History</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Panel flush eyebrow="Blender jobs" title="Generation history" actions={jobs && jobs.length > 0 ? <span className="ss-num text-xs text-muted-foreground">{jobs.length} jobs</span> : null}>
+        {jobsLoading ? (
+          <div className="space-y-2 p-5 pt-0">
+            {[0, 1, 2].map((i) => <div key={i} className="h-9 animate-shimmer rounded-md bg-[linear-gradient(90deg,hsl(var(--muted))_0%,hsl(var(--surface-3))_50%,hsl(var(--muted))_100%)] bg-[length:200%_100%]" />)}
+          </div>
+        ) : jobs && jobs.length > 0 ? (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Job ID</TableHead>
-                  <TableHead className="text-xs">Type</TableHead>
-                  <TableHead className="text-xs">Prompt</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Created</TableHead>
+                  <TableHead>Job</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Prompt</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {jobs.map((job) => (
-                  <TableRow key={job.id} className="cursor-pointer hover:bg-muted/30">
-                    <TableCell className="text-xs font-mono">{job.id.slice(0, 8)}</TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant="outline" className="text-[10px]">{job.job_type}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
-                      {job.prompt ?? "—"}
-                    </TableCell>
-                    <TableCell><JobStatusBadge status={job.status} /></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(job.created_at).toLocaleDateString()}
-                    </TableCell>
+                  <TableRow key={job.id} className="cursor-pointer" onClick={() => setActiveJobId(job.id)}>
+                    <TableCell className="ss-num text-xs">#{job.id.slice(0, 8)}</TableCell>
+                    <TableCell><StatusPill status={job.job_type} tone="data" /></TableCell>
+                    <TableCell className="max-w-[340px] truncate text-xs text-muted-foreground">{job.prompt ?? "—"}</TableCell>
+                    <TableCell><StatusPill status={job.status} className="capitalize" pulse={job.status === "processing"} /></TableCell>
+                    <TableCell className="ss-num whitespace-nowrap text-right text-xs text-muted-foreground">{new Date(job.created_at).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        ) : (
+          <div className="p-5 pt-0">
+            <EmptyState compact icon={History} title="No generations yet" description="Every model you generate is logged here with its prompt and status." />
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

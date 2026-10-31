@@ -98,9 +98,11 @@ export function StatusSelect({ value, options, onChange, tones, label = "Change 
       <SelectTrigger
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="h-auto w-auto gap-1 border-0 bg-transparent p-0 shadow-none hover:border-0 focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring [&>svg]:h-3 [&>svg]:w-3 [&>svg]:opacity-40 hover:[&>svg]:opacity-100"
+        className="h-auto w-auto gap-1 rounded-full border-0 bg-transparent p-0 shadow-none hover:border-0 focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring [&>span]:!line-clamp-none [&>svg]:h-3 [&>svg]:w-3 [&>svg]:opacity-40 hover:[&>svg]:opacity-100"
       >
-        <StatusPill status={value} tone={tones?.[value]} />
+        <span className="flex">
+          <StatusPill status={value} tone={tones?.[value]} />
+        </span>
       </SelectTrigger>
       <SelectContent>
         {options.map((s) => (

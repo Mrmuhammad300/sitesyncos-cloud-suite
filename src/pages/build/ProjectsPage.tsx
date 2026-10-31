@@ -1,37 +1,65 @@
-import { useState } from "react";
-import { fmtDollar } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from "react";
+import { cn, fmtDollar } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MapPin, Trash2, Download, Pencil } from "lucide-react";
+import { Plus, MapPin, Trash2, Download, Pencil, HardHat, CircleDollarSign, Flame, AlertTriangle, SearchX, FolderPlus } from "lucide-react";
+import { EmptyState, Meter, PageHeader, Panel, SearchField, StatCard, StatusPill, Toolbar } from "@/components/os";
+import { Field, SegmentBar, SkeletonCards, SkeletonRows, StatusSelect } from "@/components/build/kit";
+import { daysUntil, fmtDate } from "@/components/build/utils";
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { exportToCSV } from "@/lib/export";
+import { budgetBurn } from "@/lib/dashboard";
 import type { Database } from "@/integrations/supabase/types";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
-const statusColor: Record<string, string> = {
-  "On Track": "bg-success/10 text-success border-success/20",
-  "At Risk": "bg-warning/10 text-warning border-warning/20",
-  "Behind": "bg-destructive/10 text-destructive border-destructive/20",
-  "Complete": "bg-primary/10 text-primary border-primary/20",
-};
-
 const STATUSES = ["On Track", "At Risk", "Behind", "Complete"] as const;
+const STATUS_TONES = { Complete: "info" } as const;
 
 const fmt = fmtDollar;
+
+/** Spend running ahead of physical progress, in percentage points. */
+function burnGap(p: Project) {
+  return budgetBurn(p) - p.progress;
+}
+
+function FinishLabel({ p }: { p: Project }) {
+  if (!p.end_date) return <span className="text-muted-foreground/60">—</span>;
+  const d = daysUntil(p.end_date);
+  if (p.status === "Complete") return <span className="text-muted-foreground">{fmtDate(p.end_date, true)}</span>;
+  return (
+    <div className="leading-tight">
+      <p className="font-mono text-[12px] tabular-nums">{fmtDate(p.end_date, true)}</p>
+      <p className={cn("font-mono text-[10.5px] tabular-nums", d !== null && d < 0 ? "text-destructive" : d !== null && d <= 30 ? "text-warning" : "text-muted-foreground")}>
+        {d === null ? "" : d < 0 ? `${-d}d past` : `${d}d left`}
+      </p>
+    </div>
+  );
+}
+
+function BurnCell({ p }: { p: Project }) {
+  const burn = budgetBurn(p);
+  const gap = burnGap(p);
+  const hot = gap > 10 && p.status !== "Complete";
+  return (
+    <div className="w-32 space-y-1">
+      <div className="flex items-baseline justify-between font-mono text-[11px] tabular-nums">
+        <span className={cn(burn >= 100 ? "text-destructive" : "text-muted-foreground")}>{burn}% spent</span>
+        {hot && <span className="text-warning" title="Spend is running ahead of progress">+{gap}</span>}
+      </div>
+      <Meter value={burn} risk />
+    </div>
+  );
+}
 
 export default function ProjectsPage() {
   const { data: projects = [], isLoading } = useProjects();
@@ -84,12 +112,23 @@ export default function ProjectsPage() {
     isAllSelected, isIndeterminate,
   } = useTableFeatures<Project>(filtered, { pageSize: 25 });
 
-  const totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
-  const totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
-  const activeCount = projects.filter(p => p.status !== "Complete").length;
-  const avgProgress = projects.length
-    ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
-    : 0;
+  const m = useMemo(() => {
+    const totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
+    const totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
+    const active = projects.filter(p => p.status !== "Complete");
+    const avgProgress = projects.length
+      ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
+      : 0;
+    const behind = projects.filter(p => p.status === "Behind").length;
+    const atRisk = projects.filter(p => p.status === "At Risk").length;
+    const overBurn = active.filter(p => burnGap(p) > 10).length;
+    const burnPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+    const segments = STATUSES.map((s) => ({
+      key: s, label: s, value: projects.filter(p => p.status === s).length,
+      tone: (s === "On Track" ? "success" : s === "At Risk" ? "warning" : s === "Behind" ? "destructive" : "info") as "success" | "warning" | "destructive" | "info",
+    }));
+    return { totalBudget, totalSpent, active, avgProgress, behind, atRisk, overBurn, burnPct, segments };
+  }, [projects]);
 
   const handleSubmit = () => {
     if (!form.name) return;
@@ -126,110 +165,160 @@ export default function ProjectsPage() {
     });
   };
 
+  const isFiltering = search !== "" || statusFilter !== "all";
+  const clearFilters = () => { setSearch(""); setStatusFilter("all"); };
+  const sk = String(sortKey ?? "");
+  const onSort = (k: string) => toggleSort(k as keyof Project);
+
+  const empty = !isLoading && projects.length === 0;
+  const noResults = !isLoading && projects.length > 0 && rows.length === 0;
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
-            <Badge variant="outline" className="text-[10px]">SiteSync Build</Badge>
+    <div className="space-y-6">
+      <PageHeader
+        title="Projects"
+        description="Every job in the portfolio — status, spend against budget, and how close each one is to handover."
+        actions={
+          <>
+            <Button variant="outline" onClick={handleExportCSV} disabled={filtered.length === 0}><Download />Export</Button>
+            <Button onClick={openCreate}><Plus />New project</Button>
+          </>
+        }
+      />
+
+      <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Active projects"
+          value={m.active.length}
+          icon={HardHat}
+          tone="primary"
+          hint={`${projects.length} total · ${projects.length - m.active.length} complete`}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Portfolio budget"
+          value={fmt(m.totalBudget)}
+          icon={CircleDollarSign}
+          tone="data"
+          hint={`${fmt(m.totalSpent)} spent`}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Budget burn"
+          value={`${m.burnPct}%`}
+          icon={Flame}
+          tone={m.burnPct > m.avgProgress + 10 ? "warning" : "default"}
+          hint={`vs ${m.avgProgress}% avg progress`}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Needs attention"
+          value={m.behind + m.atRisk}
+          icon={AlertTriangle}
+          tone={m.behind ? "destructive" : m.atRisk ? "warning" : "success"}
+          hint={m.behind + m.atRisk === 0 ? "All on track" : `${m.behind} behind · ${m.atRisk} at risk`}
+          loading={isLoading}
+          onClick={m.behind + m.atRisk > 0 ? () => setStatusFilter(m.behind ? "Behind" : "At Risk") : undefined}
+        />
+      </section>
+
+      <Panel
+        flush
+        eyebrow="Portfolio"
+        title="All projects"
+        description={
+          isLoading ? undefined : m.overBurn > 0
+            ? <><span className="text-warning">{m.overBurn} active project{m.overBurn === 1 ? " is" : "s are"}</span> spending more than 10 pts ahead of progress.</>
+            : "Spend is tracking with progress across active projects."
+        }
+      >
+        {!empty && (
+          <div className="space-y-4 border-t px-5 py-4">
+            <SegmentBar segments={m.segments} active={statusFilter === "all" ? undefined : statusFilter} onSelect={setStatusFilter} />
+            <Toolbar>
+              <SearchField value={search} onChange={setSearch} placeholder="Search name or location…" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {isFiltering && <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>}
+              <span className="ml-auto hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">
+                {filtered.length} of {projects.length}
+              </span>
+            </Toolbar>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage construction projects and track progress.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />Export</Button>
-          <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1.5" />New Project</Button>
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Projects</p><p className="ss-stat-value">{projects.length}</p></CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Active</p><p className="ss-stat-value text-primary">{activeCount}</p></CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Budget</p><p className="ss-stat-value">{fmt(totalBudget)}</p></CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Avg Progress</p><p className="ss-stat-value">{avgProgress}%</p></CardContent></Card>
-      </div>
-
-      {/* Spend bar */}
-      {totalBudget > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-              <span>Total Spend vs Budget</span>
-              <span>{fmt(totalSpent)} / {fmt(totalBudget)}</span>
-            </div>
-            <Progress value={Math.min((totalSpent / totalBudget) * 100, 100)} className="h-2" />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search projects…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Mobile card list (hidden on sm+) */}
-      <div className="block sm:hidden space-y-3">
-        {isLoading ? (
-          [...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />)
-        ) : rows.map((proj) => (
-          <Card key={proj.id}>
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{proj.name}</p>
-                  {proj.location && <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{proj.location}</p>}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Badge variant="outline" className={`text-[10px] ${statusColor[proj.status] ?? ""}`}>{proj.status}</Badge>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{proj.project_manager ?? "No manager"}</span>
-                <span className="font-medium text-foreground">{fmt(Number(proj.budget))}</span>
-              </div>
-              <div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                  <span>Progress</span><span>{proj.progress}%</span>
-                </div>
-                <Progress value={proj.progress} className="h-1.5" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {!isLoading && rows.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground py-8">No projects found.</p>
         )}
-        {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
-      </div>
 
-      {/* Table (hidden on mobile) */}
-      <Card className="hidden sm:block ss-card-glow">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : (
-            <>
+        {empty ? (
+          <div className="border-t p-5">
+            <EmptyState
+              icon={FolderPlus}
+              title="No projects yet"
+              description="Create your first project to start tracking budget, schedule and field activity."
+              action={<Button size="sm" onClick={openCreate}><Plus />New project</Button>}
+            />
+          </div>
+        ) : noResults ? (
+          <div className="border-t p-5">
+            <EmptyState
+              compact
+              icon={SearchX}
+              title="No projects match"
+              description={search ? <>Nothing matches “{search}”{statusFilter !== "all" ? ` in ${statusFilter}` : ""}.</> : `No projects are ${statusFilter}.`}
+              action={<Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Mobile list */}
+            <div className="sm:hidden">
+              {isLoading ? <SkeletonCards /> : (
+                <ul className="divide-y divide-border/70 border-t">
+                  {rows.map((proj) => (
+                    <li key={proj.id} className="space-y-3 px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{proj.name}</p>
+                          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            {proj.location && <><MapPin className="h-3 w-3 shrink-0" />{proj.location} · </>}
+                            {proj.project_manager ?? "No manager"}
+                          </p>
+                        </div>
+                        <div className="-mr-2 -mt-1 flex shrink-0 items-center">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(proj)} aria-label={`Edit ${proj.name}`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)} aria-label={`Delete ${proj.name}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusPill status={proj.status} tone={proj.status === "Complete" ? "info" : undefined} />
+                        <span className="font-mono text-xs tabular-nums">
+                          {fmt(Number(proj.spent))} <span className="text-muted-foreground">/ {fmt(Number(proj.budget))}</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Meter value={proj.progress} tone="data" className="flex-1" />
+                        <span className="w-9 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{proj.progress}%</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto border-t sm:block">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">
+                    <TableHead className="w-10 pl-5">
                       <Checkbox
                         checked={isAllSelected}
                         ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
@@ -237,107 +326,112 @@ export default function ProjectsPage() {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <SortableHeader label="Project" sortKey="name" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Project)} />
-                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Project)} />
-                    <SortableHeader label="Manager" sortKey="project_manager" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Project)} />
-                    <SortableHeader label="Budget" sortKey="budget" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Project)} />
-                    <SortableHeader label="Progress" sortKey="progress" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof Project)} />
-                    <TableHead className="w-10" />
+                    <SortableHeader label="Project" sortKey="name" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Status" sortKey="status" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Manager" sortKey="project_manager" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
+                    <SortableHeader label="Budget" sortKey="budget" currentKey={sk} currentDir={sortDir} onSort={onSort} className="text-right" />
+                    <SortableHeader label="Spend" sortKey="spent" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
+                    <SortableHeader label="Progress" sortKey="progress" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Finish" sortKey="end_date" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
+                    <TableHead className="w-20 pr-5"><span className="sr-only">Actions</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((proj) => (
-                    <TableRow key={proj.id} data-selected={selected.has(proj.id)}>
-                      <TableCell>
-                        <Checkbox checked={selected.has(proj.id)} onCheckedChange={() => toggleSelect(proj.id)} />
+                  {isLoading ? <SkeletonRows cols={9} /> : rows.map((proj) => (
+                    <TableRow key={proj.id} data-state={selected.has(proj.id) ? "selected" : undefined} className="group">
+                      <TableCell className="pl-5">
+                        <Checkbox checked={selected.has(proj.id)} onCheckedChange={() => toggleSelect(proj.id)} aria-label={`Select ${proj.name}`} />
+                      </TableCell>
+                      <TableCell className="max-w-[260px]">
+                        <p className="truncate font-medium">{proj.name}</p>
+                        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                          {proj.location && <><MapPin className="h-3 w-3 shrink-0" />{proj.location}</>}
+                          {proj.phase && <span className="text-muted-foreground/70"> · {proj.phase}</span>}
+                        </p>
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm font-medium">{proj.name}</p>
-                        {proj.location && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />{proj.location}
-                          </p>
-                        )}
+                        <StatusSelect value={proj.status} options={STATUSES} tones={STATUS_TONES} onChange={v => updateProject.mutate({ id: proj.id, status: v })} label={`Status for ${proj.name}`} />
                       </TableCell>
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">{proj.project_manager ?? "—"}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{fmt(Number(proj.budget))}</TableCell>
+                      <TableCell className="hidden md:table-cell"><BurnCell p={proj} /></TableCell>
                       <TableCell>
-                        <Select
-                          value={proj.status}
-                          onValueChange={v => updateProject.mutate({ id: proj.id, status: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
-                            <Badge variant="outline" className={`text-[10px] ${statusColor[proj.status] ?? ""}`}>{proj.status}</Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-sm">{proj.project_manager ?? "—"}</TableCell>
-                      <TableCell className="text-sm font-medium">{fmt(Number(proj.budget))}</TableCell>
-                      <TableCell>
-                        <div className="w-24">
-                          <div className="text-[10px] text-muted-foreground mb-1">{proj.progress}%</div>
-                          <Progress value={proj.progress} className="h-1.5" />
+                        <div className="flex w-28 items-center gap-2">
+                          <Meter value={proj.progress} tone={proj.status === "Complete" ? "info" : "data"} className="flex-1" />
+                          <span className="w-8 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{proj.progress}%</span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)}>
+                      <TableCell className="hidden xl:table-cell"><FinishLabel p={proj} /></TableCell>
+                      <TableCell className="pr-5">
+                        <div className="flex items-center justify-end gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(proj)} aria-label={`Edit ${proj.name}`}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(proj.id)} aria-label={`Delete ${proj.name}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                        No projects found.
-                      </TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
-              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
-            </>
-          )}
-        </CardContent>
-      </Card>
+              {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
+            </div>
+          </>
+        )}
+      </Panel>
 
       {/* Create / Edit Dialog */}
       <Dialog open={open} onOpenChange={o => { if (!o) { setOpen(false); setEditingProject(null); } else setOpen(true); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingProject ? "Edit Project" : "New Project"}</DialogTitle></DialogHeader>
-          <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div><Label className="text-xs">Location</Label><Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Project Manager</Label><Input value={form.project_manager} onChange={e => setForm(f => ({ ...f, project_manager: e.target.value }))} /></div>
-              <div>
-                <Label className="text-xs">Status</Label>
-                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingProject ? "Edit project" : "New project"}</DialogTitle>
+            <DialogDescription>{editingProject ? "Update the project’s details, budget and schedule." : "Set up a project to track budget, schedule and field activity."}</DialogDescription>
+          </DialogHeader>
+          <form
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+            onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+          >
+            <Field label="Project name" htmlFor="p-name" required className="sm:col-span-2">
+              <Input id="p-name" autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Harbor Point Tower" />
+            </Field>
+            <Field label="Location" htmlFor="p-loc">
+              <Input id="p-loc" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="City, State" />
+            </Field>
+            <Field label="Project manager" htmlFor="p-pm">
+              <Input id="p-pm" value={form.project_manager} onChange={e => setForm(f => ({ ...f, project_manager: e.target.value }))} />
+            </Field>
+            <Field label="Status">
+              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
+                <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Budget (USD)" htmlFor="p-budget">
+              <Input id="p-budget" type="number" inputMode="decimal" className="font-mono tabular-nums" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} placeholder="0" />
+            </Field>
+            <Field label="Start date" htmlFor="p-start">
+              <Input id="p-start" type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+            </Field>
+            <Field label="End date" htmlFor="p-end">
+              <Input id="p-end" type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
+            </Field>
+            <Field label="Progress (%)" htmlFor="p-prog" className="sm:col-span-2">
+              <div className="flex items-center gap-3">
+                <Input id="p-prog" type="number" min="0" max="100" className="w-24 font-mono tabular-nums" value={form.progress} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} placeholder="0" />
+                <Meter value={Number(form.progress) || 0} tone="data" className="flex-1" />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Budget ($)</Label><Input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
-              <div><Label className="text-xs">Progress (%)</Label><Input type="number" min="0" max="100" value={form.progress} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Start Date</Label><Input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></div>
-              <div><Label className="text-xs">End Date</Label><Input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} /></div>
-            </div>
-            <Button className="w-full" onClick={handleSubmit} disabled={!form.name || createProject.isPending || updateProject.isPending}>
-              {editingProject
-                ? (updateProject.isPending ? "Saving…" : "Save Changes")
-                : (createProject.isPending ? "Creating…" : "Create Project")}
-            </Button>
-          </div>
+            </Field>
+            <DialogFooter className="gap-2 sm:col-span-2">
+              <Button type="button" variant="ghost" onClick={() => { setOpen(false); setEditingProject(null); }}>Cancel</Button>
+              <Button type="submit" disabled={!form.name || createProject.isPending || updateProject.isPending}>
+                {editingProject
+                  ? (updateProject.isPending ? "Saving…" : "Save changes")
+                  : (createProject.isPending ? "Creating…" : "Create project")}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -345,8 +439,10 @@ export default function ProjectsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Delete this project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {projects.find(p => p.id === deleteId)?.name ?? "This project"} will be removed permanently. This can’t be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -354,13 +450,12 @@ export default function ProjectsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { if (deleteId) { deleteProject.mutate(deleteId); setDeleteId(null); } }}
             >
-              Delete
+              Delete project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Action Bar */}
       <BulkActionBar
         count={selectedCount}
         onClear={clearSelection}

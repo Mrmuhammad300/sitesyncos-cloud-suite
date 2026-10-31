@@ -1,33 +1,37 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Activity, Brain, CheckCircle2, Gauge, GitBranch, History, Inbox, MessageSquarePlus, MessagesSquare, Radio,
+  ShieldAlert, ThumbsDown, ThumbsUp, UserCheck, XCircle,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Bot, Activity, ShieldCheck, Clock, CheckCircle2, XCircle, AlertTriangle, Brain, Zap } from "lucide-react";
-import { toast } from "sonner";
+import { EmptyState, PageHeader, Panel, StatCard, StatusPill } from "@/components/os";
+import { AssistantChat } from "@/components/ai/AssistantChat";
+import { ApprovalQueue } from "@/components/ai/ApprovalQueue";
+import { isPendingApproval } from "@/components/ai/approvals";
+import { EXEC_LABEL, EXEC_TONE, confidencePct, execState, fmtLatency, humanize, timeAgo } from "@/components/ai/agent-meta";
+import { Confidence, RiskFlags, Shimmer } from "@/components/ai/primitives";
 
-const autonomyColor: Record<string, string> = {
-  FullAuto: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  AutoWithAudit: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  DraftWithApproval: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  AdvisoryOnly: "bg-muted text-muted-foreground",
-};
-
-const statusIcon: Record<string, React.ReactNode> = {
-  Completed: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-  Failed: <XCircle className="h-4 w-4 text-destructive" />,
-  Pending: <Clock className="h-4 w-4 text-amber-500" />,
-  Running: <Activity className="h-4 w-4 text-blue-500 animate-pulse" />,
-};
+const TABS = ["ask", "approvals", "decisions", "history", "learning"] as const;
+type Tab = (typeof TABS)[number];
 
 export default function AIAssistantPage() {
-  const queryClient = useQueryClient();
-  const [feedbackText, setFeedbackText] = useState<Record<string, string>>({});
+  const [params, setParams] = useSearchParams();
+  const initial = params.get("tab");
+  const [tab, setTabState] = useState<Tab>(TABS.includes(initial as Tab) ? (initial as Tab) : "ask");
+  const [chatKey, setChatKey] = useState(0);
+
+  const setTab = (t: string) => {
+    setTabState(t as Tab);
+    const next = new URLSearchParams(params);
+    if (t === "ask") next.delete("tab");
+    else next.set("tab", t);
+    setParams(next, { replace: true });
+  };
 
   const { data: agents } = useQuery({
     queryKey: ["ai_agents"],
@@ -38,7 +42,7 @@ export default function AIAssistantPage() {
     },
   });
 
-  const { data: executions } = useQuery({
+  const { data: executions, isLoading: execLoading } = useQuery({
     queryKey: ["agent_executions"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -51,7 +55,7 @@ export default function AIAssistantPage() {
     },
   });
 
-  const { data: decisions } = useQuery({
+  const { data: decisions, isLoading: decLoading } = useQuery({
     queryKey: ["agent_decisions"],
     queryFn: async () => {
       const { data, error } = await supabase.from("agent_decisions").select("*").order("created_at", { ascending: false }).limit(50);
@@ -60,7 +64,7 @@ export default function AIAssistantPage() {
     },
   });
 
-  const { data: learningSignals } = useQuery({
+  const { data: learningSignals, isLoading: sigLoading } = useQuery({
     queryKey: ["agent_learning_signals"],
     queryFn: async () => {
       const { data, error } = await supabase.from("agent_learning_signals").select("*").order("created_at", { ascending: false }).limit(50);
@@ -69,278 +73,228 @@ export default function AIAssistantPage() {
     },
   });
 
-  const pendingApprovals = executions?.filter((e) => e.requires_approval && e.approval_status !== "approved" && e.approval_status !== "rejected") ?? [];
-
-  const approvalMutation = useMutation({
-    mutationFn: async ({ id, status, feedback }: { id: string; status: "approved" | "rejected"; feedback?: string }) => {
-      const { error } = await supabase
-        .from("agent_executions")
-        .update({ approval_status: status, approval_feedback: feedback ?? null })
-        .eq("id", id);
-      if (error) throw error;
-
-      const exec = executions?.find((e) => e.id === id);
-      if (exec) {
-        const { error: sigError } = await supabase.from("agent_learning_signals").insert({
-          execution_id: exec.execution_id,
-          agent_id: exec.agent_id,
-          signal_type: "approval",
-          is_positive: status === "approved",
-          feedback: feedback ?? null,
-        });
-        if (sigError) console.error("Learning signal error:", sigError);
-      }
-    },
-    onSuccess: () => {
-      toast.success("Decision recorded");
-      queryClient.invalidateQueries({ queryKey: ["agent_executions"] });
-      queryClient.invalidateQueries({ queryKey: ["agent_learning_signals"] });
-    },
-  });
+  const pendingApprovals = executions?.filter(isPendingApproval) ?? [];
+  const nameMap = new Map((agents ?? []).map((a) => [a.agent_id, a.name]));
+  const nameOf = (id: string) => nameMap.get(id) ?? id;
 
   const activeCount = agents?.filter((a) => a.is_active).length ?? 0;
-  const completedCount = executions?.filter((e) => e.status === "Completed").length ?? 0;
+  const completedCount = executions?.filter((e) => execState(e.status) === "completed").length ?? 0;
   const avgConfidence = executions?.length
     ? (executions.reduce((s, e) => s + (Number(e.confidence_score) || 0), 0) / executions.length * 100).toFixed(0)
     : "0";
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Bot className="h-6 w-6 text-primary" /> AI Command Center
-          </h1>
-          <p className="text-sm text-muted-foreground">Agent orchestration, Binary Loom decisions & learning feedback</p>
+    <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+      <PageHeader
+        title="AI Assistant"
+        description="Ask questions of your live portfolio, and review what your agents decided, flagged and learned."
+        actions={
+          tab === "ask" ? (
+            <Button variant="outline" onClick={() => setChatKey((k) => k + 1)}>
+              <MessageSquarePlus />New chat
+            </Button>
+          ) : undefined
+        }
+      >
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList className="w-max">
+            <TabsTrigger value="ask"><MessagesSquare className="h-3.5 w-3.5" />Ask</TabsTrigger>
+            <TabsTrigger value="approvals">
+              <Inbox className="h-3.5 w-3.5" />Approvals
+              {pendingApprovals.length > 0 && (
+                <span className="rounded-full bg-warning/15 px-1.5 font-mono text-[10px] tabular-nums text-warning">{pendingApprovals.length}</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="decisions"><GitBranch className="h-3.5 w-3.5" />Decisions</TabsTrigger>
+            <TabsTrigger value="history"><History className="h-3.5 w-3.5" />History</TabsTrigger>
+            <TabsTrigger value="learning"><Brain className="h-3.5 w-3.5" />Learning</TabsTrigger>
+          </TabsList>
         </div>
-      </div>
+      </PageHeader>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="ss-stat-card"><CardContent className="p-0">
-          <p className="ss-stat-label">Active Agents</p>
-          <p className="ss-stat-value">{activeCount}<span className="text-sm font-normal text-muted-foreground">/{agents?.length ?? 0}</span></p>
-        </CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0">
-          <p className="ss-stat-label">Executions</p>
-          <p className="ss-stat-value">{completedCount}</p>
-        </CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0">
-          <p className="ss-stat-label">Avg Confidence</p>
-          <p className="ss-stat-value">{avgConfidence}%</p>
-        </CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0">
-          <p className="ss-stat-label">Pending Approvals</p>
-          <p className="ss-stat-value text-amber-500">{pendingApprovals.length}</p>
-        </CardContent></Card>
-      </div>
+      {tab !== "ask" && (
+        <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Active agents" value={<>{activeCount}<span className="text-base text-muted-foreground">/{agents?.length ?? 0}</span></>} icon={Radio} tone={activeCount ? "success" : "default"} loading={!agents} />
+          <StatCard label="Completed runs" value={completedCount} icon={CheckCircle2} hint={`of ${executions?.length ?? 0} recent`} loading={execLoading} />
+          <StatCard label="Avg confidence" value={`${avgConfidence}%`} icon={Gauge} tone={Number(avgConfidence) >= 80 ? "success" : "default"} loading={execLoading} />
+          <StatCard
+            label="Pending approvals"
+            value={pendingApprovals.length}
+            icon={Inbox}
+            tone={pendingApprovals.length ? "warning" : "default"}
+            hint={pendingApprovals.length ? "Needs review" : "Queue clear"}
+            loading={execLoading}
+            onClick={tab !== "approvals" ? () => setTab("approvals") : undefined}
+          />
+        </section>
+      )}
 
-      <Tabs defaultValue="agents">
-        <TabsList>
-          <TabsTrigger value="agents">Agents ({agents?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="binary-loom">Binary Loom</TabsTrigger>
-          <TabsTrigger value="approvals">Approvals ({pendingApprovals.length})</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="learning">Learning</TabsTrigger>
-        </TabsList>
+      {/* ── Ask ── */}
+      <TabsContent value="ask" className="mt-0">
+        <AssistantChat key={chatKey} />
+      </TabsContent>
 
-        {/* TAB: Agent Grid */}
-        <TabsContent value="agents">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {agents?.map((a) => (
-              <Card key={a.id} className="group hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-sm">{a.name}</CardTitle>
-                    <Switch checked={a.is_active} disabled className="scale-75" />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge className={autonomyColor[a.autonomy_level] ?? "bg-muted text-muted-foreground"} variant="outline">
-                      {a.autonomy_level}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">{a.agent_type}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* TAB: Binary Loom */}
-        <TabsContent value="binary-loom">
-          <BinaryLoomTab decisions={decisions ?? []} />
-        </TabsContent>
-
-        {/* TAB: Approvals */}
-        <TabsContent value="approvals">
-          {pendingApprovals.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-muted-foreground">No pending approvals</CardContent></Card>
+      {/* ── Approvals ── */}
+      <TabsContent value="approvals" className="mt-0">
+        <Panel glow={pendingApprovals.length > 0} eyebrow="Human in the loop" title="Waiting on your decision" description="Approving or rejecting records a learning signal the agent trains on.">
+          {execLoading ? (
+            <div className="space-y-2">{[0, 1, 2].map((i) => <Shimmer key={i} className="h-24" />)}</div>
           ) : (
-            <div className="space-y-3">
-              {pendingApprovals.map((exec) => (
-                <Card key={exec.id}>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{exec.agent_id} — {exec.event_type}</p>
-                        <p className="text-xs text-muted-foreground">{exec.reasoning}</p>
-                        {exec.risk_flags && exec.risk_flags.length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {exec.risk_flags.map((f, i) => (
-                              <Badge key={i} variant="destructive" className="text-[10px]"><AlertTriangle className="h-3 w-3 mr-0.5" />{f}</Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <Badge variant="outline">{(Number(exec.confidence_score) * 100).toFixed(0)}%</Badge>
-                    </div>
-                    <Textarea
-                      placeholder="Feedback (optional)..."
-                      className="h-16 text-xs"
-                      value={feedbackText[exec.id] ?? ""}
-                      onChange={(e) => setFeedbackText((p) => ({ ...p, [exec.id]: e.target.value }))}
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => approvalMutation.mutate({ id: exec.id, status: "approved", feedback: feedbackText[exec.id] })}>
-                        <CheckCircle2 className="h-4 w-4 mr-1" />Approve
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => approvalMutation.mutate({ id: exec.id, status: "rejected", feedback: feedbackText[exec.id] })}>
-                        <XCircle className="h-4 w-4 mr-1" />Reject
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="mx-auto max-w-3xl">
+              <ApprovalQueue executions={executions} agentName={nameOf} />
             </div>
           )}
-        </TabsContent>
+        </Panel>
+      </TabsContent>
 
-        {/* TAB: History */}
-        <TabsContent value="history">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead>Event</TableHead>
-                <TableHead>Confidence</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {executions?.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell>{statusIcon[e.status] ?? e.status}</TableCell>
-                  <TableCell className="font-medium text-xs">{e.agent_id}</TableCell>
-                  <TableCell className="text-xs">{e.event_type}</TableCell>
-                  <TableCell><Badge variant="outline">{(Number(e.confidence_score) * 100).toFixed(0)}%</Badge></TableCell>
-                  <TableCell className="text-xs">{e.duration_ms ? `${e.duration_ms}ms` : "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TabsContent>
+      {/* ── Decisions (Binary Loom) ── */}
+      <TabsContent value="decisions" className="mt-0">
+        <BinaryLoomTab decisions={decisions ?? []} loading={decLoading} nameOf={nameOf} />
+      </TabsContent>
 
-        {/* TAB: Learning */}
-        <TabsContent value="learning">
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <Card><CardContent className="pt-4 text-center">
-                <p className="text-xs text-muted-foreground">Positive Signals</p>
-                <p className="text-2xl font-bold text-emerald-500">{learningSignals?.filter((s) => s.is_positive).length ?? 0}</p>
-              </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
-                <p className="text-xs text-muted-foreground">Negative Signals</p>
-                <p className="text-2xl font-bold text-destructive">{learningSignals?.filter((s) => !s.is_positive).length ?? 0}</p>
-              </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
-                <p className="text-xs text-muted-foreground">Approval Rate</p>
-                <p className="text-2xl font-bold">
-                  {learningSignals?.length
-                    ? ((learningSignals.filter((s) => s.is_positive).length / learningSignals.length) * 100).toFixed(0)
-                    : 0}%
-                </p>
-              </CardContent></Card>
+      {/* ── History ── */}
+      <TabsContent value="history" className="mt-0">
+        <Panel flush eyebrow="Execution log" title="Last 50 runs">
+          {execLoading ? (
+            <TableSkeleton />
+          ) : !executions?.length ? (
+            <div className="p-5 pt-0"><EmptyState compact icon={Activity} title="No runs recorded" description="Agent executions will be logged here with confidence, duration and status." /></div>
+          ) : (
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Confidence</TableHead>
+                    <TableHead>Flags</TableHead>
+                    <TableHead className="text-right">Duration</TableHead>
+                    <TableHead className="text-right">When</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {executions.map((e) => {
+                    const st = execState(e.status);
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell><StatusPill status={EXEC_LABEL[st]} tone={EXEC_TONE[st]} pulse={st === "running"} /></TableCell>
+                        <TableCell className="whitespace-nowrap text-[13px] font-medium">{nameOf(e.agent_id)}</TableCell>
+                        <TableCell className="whitespace-nowrap font-mono text-[11.5px] text-muted-foreground">{e.event_type}</TableCell>
+                        <TableCell><Confidence value={confidencePct(e.confidence_score)} /></TableCell>
+                        <TableCell>{e.risk_flags?.length ? <RiskFlags flags={e.risk_flags} max={2} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="text-right font-mono text-[11.5px] tabular-nums">{fmtLatency(e.duration_ms)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-mono text-[11px] text-muted-foreground" title={new Date(e.created_at).toLocaleString()}>{timeAgo(e.created_at)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
+          )}
+        </Panel>
+      </TabsContent>
+
+      {/* ── Learning ── */}
+      <TabsContent value="learning" className="mt-0 space-y-3">
+        {(() => {
+          const pos = learningSignals?.filter((s) => s.is_positive).length ?? 0;
+          const neg = learningSignals?.filter((s) => !s.is_positive).length ?? 0;
+          const rate = learningSignals?.length ? ((pos / learningSignals.length) * 100).toFixed(0) : 0;
+          return (
+            <section className="grid grid-cols-3 gap-3">
+              <StatCard label="Positive" value={pos} icon={ThumbsUp} tone="success" loading={sigLoading} />
+              <StatCard label="Negative" value={neg} icon={ThumbsDown} tone={neg ? "destructive" : "default"} loading={sigLoading} />
+              <StatCard label="Approval rate" value={`${rate}%`} icon={UserCheck} loading={sigLoading} />
+            </section>
+          );
+        })()}
+        <Panel flush eyebrow="Feedback loop" title="Learning signals">
+          {sigLoading ? (
+            <TableSkeleton />
+          ) : !learningSignals?.length ? (
+            <div className="p-5 pt-0"><EmptyState compact icon={Brain} title="No feedback yet" description="Approve or reject an agent's draft and the signal will appear here." action={<Button size="sm" variant="outline" onClick={() => setTab("approvals")}><Inbox />Review approvals</Button>} /></div>
+          ) : (
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Agent</TableHead><TableHead>Type</TableHead><TableHead>Result</TableHead><TableHead>Feedback</TableHead><TableHead className="text-right">When</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {learningSignals.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="whitespace-nowrap text-[13px] font-medium">{nameOf(s.agent_id)}</TableCell>
+                      <TableCell className="font-mono text-[11.5px] text-muted-foreground">{s.signal_type}</TableCell>
+                      <TableCell>{s.is_positive ? <StatusPill status="Positive" tone="success" /> : <StatusPill status="Negative" tone="destructive" />}</TableCell>
+                      <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">{s.feedback ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-mono text-[11px] text-muted-foreground">{timeAgo(s.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </Panel>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function TableSkeleton() {
+  return <div className="space-y-2 p-5 pt-0">{[0, 1, 2, 3, 4].map((i) => <Shimmer key={i} className="h-9" />)}</div>;
+}
+
+/* ─── Binary Loom ─── */
+function BinaryLoomTab({ decisions, loading, nameOf }: { decisions: Array<Record<string, unknown>>; loading: boolean; nameOf: (id: string) => string }) {
+  const binaryDecisions = decisions.filter((d) => d.agent_id === "binary-loom" || d.decision_type === "go_no_go");
+  const allDecisions = binaryDecisions.length > 0 ? binaryDecisions : decisions;
+  const high = allDecisions.filter((d) => Number(d.confidence) > 0.8).length;
+  const flagged = allDecisions.filter((d) => ((d.risk_flags as string[]) ?? []).length > 0).length;
+
+  return (
+    <div className="space-y-3">
+      <section className="grid grid-cols-3 gap-3">
+        <StatCard label="Decisions" value={allDecisions.length} icon={GitBranch} loading={loading} />
+        <StatCard label="High confidence" value={high} icon={CheckCircle2} tone="success" hint="> 80%" loading={loading} />
+        <StatCard label="Flagged" value={flagged} icon={ShieldAlert} tone={flagged ? "warning" : "default"} loading={loading} />
+      </section>
+      <Panel
+        flush
+        eyebrow="Binary Loom · decision weaver"
+        title="Go / no-go classifications"
+        description="Cross-references budget data with daily reports to classify construction workflows."
+      >
+        {loading ? (
+          <TableSkeleton />
+        ) : allDecisions.length === 0 ? (
+          <div className="p-5 pt-0"><EmptyState compact icon={GitBranch} title="No decisions recorded" description="When an agent makes a go/no-go call it's logged here with its confidence and any policy flags." /></div>
+        ) : (
+          <div className="overflow-x-auto border-t">
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Agent</TableHead><TableHead>Type</TableHead><TableHead>Result</TableHead><TableHead>Feedback</TableHead><TableHead>Time</TableHead></TableRow>
+                <TableRow><TableHead>Agent</TableHead><TableHead>Type</TableHead><TableHead>Confidence</TableHead><TableHead>Flags</TableHead><TableHead>Human review</TableHead></TableRow>
               </TableHeader>
               <TableBody>
-                {learningSignals?.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium text-xs">{s.agent_id}</TableCell>
-                    <TableCell className="text-xs">{s.signal_type}</TableCell>
-                    <TableCell>{s.is_positive ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-destructive" />}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{s.feedback ?? "—"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</TableCell>
+                {allDecisions.slice(0, 20).map((d) => (
+                  <TableRow key={d.id as string}>
+                    <TableCell className="whitespace-nowrap text-[13px] font-medium">{nameOf(d.agent_id as string)}</TableCell>
+                    <TableCell className="font-mono text-[11.5px] text-muted-foreground">{humanize(d.decision_type as string)}</TableCell>
+                    <TableCell><Confidence value={confidencePct(d.confidence as number)} /></TableCell>
+                    <TableCell>
+                      {((d.risk_flags as string[]) ?? []).length > 0 ? <RiskFlags flags={d.risk_flags as string[]} max={2} /> : <span className="text-xs text-muted-foreground">None</span>}
+                    </TableCell>
+                    <TableCell>
+                      {(d.requires_human as boolean)
+                        ? <StatusPill status="Required" tone="warning" />
+                        : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Not needed</span>}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-/* ─── Binary Loom Sub-component ─── */
-function BinaryLoomTab({ decisions }: { decisions: Array<Record<string, unknown>> }) {
-  const binaryDecisions = decisions.filter((d) => d.agent_id === "binary-loom" || d.decision_type === "go_no_go");
-  const allDecisions = binaryDecisions.length > 0 ? binaryDecisions : decisions;
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><Brain className="h-5 w-5 text-primary" />Binary Loom — Decision Weaver</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Cross-references budget data with daily reports to produce binary go/no-go classifications across construction workflows.
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            <Card><CardContent className="pt-3 text-center">
-              <p className="text-xs text-muted-foreground">Total Decisions</p>
-              <p className="text-xl font-bold">{allDecisions.length}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-3 text-center">
-              <p className="text-xs text-muted-foreground">High Confidence</p>
-              <p className="text-xl font-bold text-emerald-500">{allDecisions.filter((d) => Number(d.confidence) > 0.8).length}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-3 text-center">
-              <p className="text-xs text-muted-foreground">Flagged</p>
-              <p className="text-xl font-bold text-amber-500">{allDecisions.filter((d) => ((d.risk_flags as string[]) ?? []).length > 0).length}</p>
-            </CardContent></Card>
-          </div>
-        </CardContent>
-      </Card>
-      <Table>
-        <TableHeader>
-          <TableRow><TableHead>Agent</TableHead><TableHead>Type</TableHead><TableHead>Confidence</TableHead><TableHead>Flags</TableHead><TableHead>Human?</TableHead></TableRow>
-        </TableHeader>
-        <TableBody>
-          {allDecisions.slice(0, 20).map((d) => (
-            <TableRow key={d.id as string}>
-              <TableCell className="text-xs font-medium">{d.agent_id as string}</TableCell>
-              <TableCell className="text-xs">{d.decision_type as string}</TableCell>
-              <TableCell><Badge variant="outline">{(Number(d.confidence) * 100).toFixed(0)}%</Badge></TableCell>
-              <TableCell>
-                {((d.risk_flags as string[]) ?? []).length > 0 ? (
-                  <Badge variant="destructive" className="text-[10px]"><Zap className="h-3 w-3 mr-0.5" />{((d.risk_flags as string[]) ?? []).length}</Badge>
-                ) : <span className="text-xs text-muted-foreground">None</span>}
-              </TableCell>
-              <TableCell>{(d.requires_human as boolean) ? <AlertTriangle className="h-4 w-4 text-amber-500" /> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+        )}
+      </Panel>
     </div>
   );
 }

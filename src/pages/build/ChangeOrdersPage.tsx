@@ -1,37 +1,64 @@
-import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ArrowUpRight, Trash2, Download, Printer } from "lucide-react";
+import { Plus, Trash2, Download, Printer, Layers, Scale, Hourglass, CalendarRange, SearchX, FilePlus2 } from "lucide-react";
+import { EmptyState, PageHeader, Panel, SearchField, StatCard, StatusPill, Toolbar, type StatusTone } from "@/components/os";
+import { Field, SkeletonCards, SkeletonRows, StatusSelect } from "@/components/build/kit";
+import { fmtSignedDollar } from "@/components/build/utils";
 import { useChangeOrders, useCreateChangeOrder, useUpdateChangeOrder, useDeleteChangeOrder, useProjects } from "@/hooks/useProjectData";
 import { useTableFeatures } from "@/hooks/useTableFeatures";
 import { SortableHeader } from "@/components/SortableHeader";
 import { TablePagination } from "@/components/TablePagination";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { exportToCSV, printToPDF } from "@/lib/export";
-import { fmtDollar } from "@/lib/utils";
+import { cn, fmtDollar } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChangeOrder = Database["public"]["Tables"]["change_orders"]["Row"];
 
-const statusColor: Record<string, string> = {
-  Pending: "bg-muted text-muted-foreground",
-  "Under Review": "bg-warning/10 text-warning border-warning/20",
-  Approved: "bg-success/10 text-success border-success/20",
-  Rejected: "bg-destructive/10 text-destructive border-destructive/20",
-};
-
 const STATUSES = ["Pending", "Under Review", "Approved", "Rejected"] as const;
+const STATUS_TONES: Partial<Record<string, StatusTone>> = { Pending: "warning", "Under Review": "info" };
 const CATEGORIES = ["Scope Addition", "Scope Reduction", "Design Change", "Unforeseen Conditions", "Owner Request", "Other"] as const;
 
 const fmt = fmtDollar;
+const signed = (v: number) => fmtSignedDollar(v, fmt);
+const isOpen = (co: ChangeOrder) => co.status !== "Approved" && co.status !== "Rejected";
+
+function Amount({ v }: { v: number }) {
+  return (
+    <span className={cn("font-mono tabular-nums", v < 0 ? "text-success" : "text-foreground")}>
+      {v < 0 ? signed(v) : fmt(v)}
+    </span>
+  );
+}
+
+function Days({ d }: { d: number }) {
+  if (!d) return <span className="font-mono text-xs tabular-nums text-muted-foreground">0d</span>;
+  return (
+    <span className={cn("font-mono text-xs tabular-nums", d > 0 ? "text-warning" : "text-success")}>
+      {d > 0 ? "+" : "−"}{Math.abs(d)}d
+    </span>
+  );
+}
+
+/** One line of the impact ledger. */
+function LedgerRow({ label, sub, value, tone, strong }: { label: string; sub?: string; value: string; tone?: string; strong?: boolean }) {
+  return (
+    <div className={cn("flex items-baseline justify-between gap-3 py-2", strong && "border-t pt-3")}>
+      <div className="min-w-0">
+        <p className={cn("text-[13px]", strong ? "font-semibold" : "text-muted-foreground")}>{label}</p>
+        {sub && <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground/80">{sub}</p>}
+      </div>
+      <span className={cn("shrink-0 font-mono tabular-nums", strong ? "text-lg" : "text-sm", tone)}>{value}</span>
+    </div>
+  );
+}
 
 export default function ChangeOrdersPage() {
   const { data: changeOrders = [], isLoading } = useChangeOrders();
@@ -66,11 +93,38 @@ export default function ChangeOrdersPage() {
     isAllSelected, isIndeterminate,
   } = useTableFeatures<ChangeOrder>(filtered, { pageSize: 25 });
 
-  const totalValue = changeOrders.reduce((s, co) => s + Number(co.amount), 0);
-  const approvedValue = changeOrders
-    .filter(co => co.status === "Approved")
-    .reduce((s, co) => s + Number(co.amount), 0);
-  const pendingCount = changeOrders.filter(co => co.status === "Pending").length;
+  const m = useMemo(() => {
+    const approved = changeOrders.filter(co => co.status === "Approved");
+    const pending = changeOrders.filter(isOpen);
+    const rejected = changeOrders.filter(co => co.status === "Rejected");
+    const sum = (xs: ChangeOrder[], f: (c: ChangeOrder) => number) => xs.reduce((s, c) => s + f(c), 0);
+    const additions = sum(approved, c => Math.max(0, Number(c.amount)));
+    const credits = sum(approved, c => Math.min(0, Number(c.amount)));
+    const netApproved = additions + credits;
+    const pendingValue = sum(pending, c => Number(c.amount));
+    const approvedDays = sum(approved, c => Number(c.days_impact));
+    const pendingDays = sum(pending, c => Number(c.days_impact));
+    const rejectedValue = sum(rejected, c => Number(c.amount));
+    // Cumulative approved value in the order COs were raised — a real trend line.
+    const spark = [...approved]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .reduce<number[]>((acc, c) => [...acc, (acc[acc.length - 1] ?? 0) + Number(c.amount)], [0]);
+    // Exposure by category: approved + pending, signed.
+    const cats = new Map<string, { approved: number; pending: number }>();
+    for (const c of [...approved, ...pending]) {
+      const key = c.category ?? "Uncategorized";
+      const e = cats.get(key) ?? { approved: 0, pending: 0 };
+      if (c.status === "Approved") e.approved += Number(c.amount);
+      else e.pending += Number(c.amount);
+      cats.set(key, e);
+    }
+    const byCategory = [...cats.entries()]
+      .map(([name, v]) => ({ name, ...v, total: v.approved + v.pending }))
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+    const maxAbs = Math.max(1, ...byCategory.map(c => Math.max(Math.abs(c.approved) + Math.abs(c.pending), 0)));
+    return { approved, pending, rejected, additions, credits, netApproved, pendingValue, approvedDays, pendingDays, rejectedValue, spark, byCategory, maxAbs };
+  }, [changeOrders]);
+
   const nextNumber = `CO-${String(changeOrders.length + 1).padStart(4, "0")}`;
 
   const handleSubmit = () => {
@@ -116,102 +170,194 @@ export default function ChangeOrdersPage() {
     printToPDF("Change Orders", `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows_html}</tbody></table>`);
   };
 
+  const isFiltering = search !== "" || statusFilter !== "all" || projectFilter !== "all";
+  const clearFilters = () => { setSearch(""); setStatusFilter("all"); setProjectFilter("all"); };
+  const sk = String(sortKey ?? "");
+  const onSort = (k: string) => toggleSort(k as keyof ChangeOrder);
+  const empty = !isLoading && changeOrders.length === 0;
+  const noResults = !isLoading && changeOrders.length > 0 && rows.length === 0;
+  const amountPreview = Number(form.amount) || 0;
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Change Orders</h1>
-            <Badge variant="outline" className="text-[10px]">SiteSync Build</Badge>
+    <div className="space-y-6">
+      <PageHeader
+        title="Change Orders"
+        description="Every scope change with its cost and schedule consequence — what’s committed, and what’s still exposure."
+        actions={
+          <>
+            <Button variant="outline" onClick={handleExportCSV} disabled={filtered.length === 0}><Download />CSV</Button>
+            <Button variant="outline" onClick={handlePrintPDF} disabled={filtered.length === 0}><Printer />PDF</Button>
+            <Button onClick={() => setOpen(true)}><Plus />New change order</Button>
+          </>
+        }
+      />
+
+      <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Net approved"
+          value={signed(m.netApproved)}
+          icon={Scale}
+          tone={m.netApproved > 0 ? "primary" : m.netApproved < 0 ? "success" : "default"}
+          hint={`${m.approved.length} approved CO${m.approved.length === 1 ? "" : "s"}`}
+          spark={m.spark.length > 2 ? m.spark : undefined}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Pending exposure"
+          value={signed(m.pendingValue)}
+          icon={Hourglass}
+          tone={m.pendingValue > 0 ? "warning" : "default"}
+          hint={`${m.pending.length} awaiting decision`}
+          loading={isLoading}
+          onClick={m.pending.length ? () => setStatusFilter("Pending") : undefined}
+        />
+        <StatCard
+          label="Schedule impact"
+          value={`${m.approvedDays > 0 ? "+" : m.approvedDays < 0 ? "−" : ""}${Math.abs(m.approvedDays)}d`}
+          icon={CalendarRange}
+          tone={m.approvedDays > 0 ? "warning" : m.approvedDays < 0 ? "success" : "default"}
+          hint={m.pendingDays ? `${m.pendingDays > 0 ? "+" : "−"}${Math.abs(m.pendingDays)}d more if pending approved` : "Approved COs only"}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Change orders"
+          value={changeOrders.length}
+          icon={Layers}
+          hint={`${m.rejected.length} rejected · ${fmt(Math.abs(m.rejectedValue))} avoided`}
+          loading={isLoading}
+        />
+      </section>
+
+      {!empty && !isLoading && (
+        <section className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+          <Panel className="lg:col-span-2" eyebrow="Net impact" title="Contract adjustment">
+            <div className="divide-y divide-border/60">
+              <LedgerRow label="Approved additions" sub={`${m.approved.filter(c => Number(c.amount) > 0).length} COs`} value={signed(m.additions)} />
+              <LedgerRow label="Approved credits" sub={`${m.approved.filter(c => Number(c.amount) < 0).length} COs · VE & deducts`} value={signed(m.credits)} tone="text-success" />
+              <LedgerRow strong label="Net to contract" value={signed(m.netApproved)} tone={m.netApproved > 0 ? "text-primary" : "text-success"} />
+              <LedgerRow label="If all pending are approved" sub={`${signed(m.pendingValue)} in review`} value={signed(m.netApproved + m.pendingValue)} tone="text-warning" />
+              <LedgerRow
+                label="Schedule, approved → projected"
+                value={`${m.approvedDays >= 0 ? "+" : "−"}${Math.abs(m.approvedDays)}d → ${m.approvedDays + m.pendingDays >= 0 ? "+" : "−"}${Math.abs(m.approvedDays + m.pendingDays)}d`}
+                tone="text-warning"
+              />
+            </div>
+          </Panel>
+
+          <Panel
+            className="lg:col-span-3"
+            eyebrow="Exposure"
+            title="By category"
+            actions={
+              <div className="hidden items-center gap-3 text-[11px] text-muted-foreground sm:flex">
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-primary" />Approved</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-warning/60" />Pending</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-success" />Credit</span>
+              </div>
+            }
+          >
+            {m.byCategory.length === 0 ? (
+              <EmptyState compact icon={Layers} title="No open or approved exposure" description="Rejected change orders don’t count toward exposure." />
+            ) : (
+              <ul className="space-y-3">
+                {m.byCategory.map(c => {
+                  const aw = (Math.abs(c.approved) / m.maxAbs) * 100;
+                  const pw = (Math.abs(c.pending) / m.maxAbs) * 100;
+                  return (
+                    <li key={c.name} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)_5.5rem]">
+                      <span className="truncate text-xs text-muted-foreground" title={c.name}>{c.name}</span>
+                      <div className="flex h-2.5 overflow-hidden rounded-full bg-secondary">
+                        {c.approved !== 0 && <div className={cn("h-full", c.approved < 0 ? "bg-success" : "bg-primary")} style={{ width: `${aw}%` }} />}
+                        {c.pending !== 0 && <div className={cn("h-full", c.pending < 0 ? "bg-success/50" : "bg-warning/60")} style={{ width: `${pw}%` }} />}
+                      </div>
+                      <span className={cn("text-right font-mono text-xs tabular-nums", c.total < 0 && "text-success")}>{signed(c.total)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
+        </section>
+      )}
+
+      <Panel flush eyebrow="Log" title="All change orders">
+        {!empty && (
+          <div className="border-t px-5 py-4">
+            <Toolbar>
+              <SearchField value={search} onChange={setSearch} placeholder="Search title or CO #…" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {projects.length > 0 && (
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className="h-9 w-[180px] text-xs" aria-label="Filter by project"><SelectValue placeholder="All projects" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All projects</SelectItem>
+                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {isFiltering && <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>}
+              <span className="ml-auto hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">{filtered.length} of {changeOrders.length}</span>
+            </Toolbar>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Review, approve, and track change orders and cost impacts.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handlePrintPDF}><Printer className="h-4 w-4 mr-1.5" />PDF</Button>
-          <Button size="sm" variant="outline" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1.5" />CSV</Button>
-          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1.5" />New Change Order</Button>
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total COs</p><p className="ss-stat-value">{changeOrders.length}</p></CardContent></Card>
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Total Value</p><p className="ss-stat-value">{fmt(totalValue)}</p></CardContent></Card>
-        <Card className="ss-stat-card">
-          <CardContent className="p-0">
-            <p className="ss-stat-label">Approved Value</p>
-            <p className="ss-stat-value text-success flex items-center gap-1">
-              <ArrowUpRight className="h-4 w-4" />{fmt(approvedValue)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="ss-stat-card"><CardContent className="p-0"><p className="ss-stat-label">Pending</p><p className="ss-stat-value text-warning">{pendingCount}</p></CardContent></Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search change orders…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {projects.length > 0 && (
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="All Projects" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
         )}
-      </div>
 
-      {/* Mobile cards */}
-      <div className="block sm:hidden space-y-3">
-        {isLoading ? (
-          [1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No change orders found.</p>
-        ) : rows.map((co) => (
-          <Card key={co.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{co.title}</p>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{co.co_number}{co.category ? ` · ${co.category}` : ""}</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(co.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant="outline" className={`text-[10px] ${statusColor[co.status] ?? ""}`}>{co.status}</Badge>
-                <span className="text-xs font-mono font-medium">{fmt(Number(co.amount))}</span>
-                {Number(co.days_impact) > 0 && <span className="text-xs text-warning">+{co.days_impact}d</span>}
-                {co.requested_by && <span className="text-xs text-muted-foreground">{co.requested_by}</span>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+        {empty ? (
+          <div className="border-t p-5">
+            <EmptyState
+              icon={FilePlus2}
+              title="No change orders yet"
+              description="Log scope changes with their cost and schedule impact so the contract sum stays honest."
+              action={<Button size="sm" onClick={() => setOpen(true)}><Plus />New change order</Button>}
+            />
+          </div>
+        ) : noResults ? (
+          <div className="border-t p-5">
+            <EmptyState
+              compact
+              icon={SearchX}
+              title="No change orders match"
+              description={search ? <>Nothing matches “{search}”.</> : "No change orders with this status or project."}
+              action={<Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="sm:hidden">
+              {isLoading ? <SkeletonCards /> : (
+                <ul className="divide-y divide-border/70 border-t">
+                  {rows.map((co) => (
+                    <li key={co.id} className="space-y-2.5 px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-[11px] text-muted-foreground">{co.co_number}{co.category ? ` · ${co.category}` : ""}</p>
+                          <p className="text-sm font-medium leading-snug">{co.title}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="-mr-2 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(co.id)} aria-label={`Delete ${co.co_number}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusPill status={co.status} tone={STATUS_TONES[co.status]} />
+                        <span className="flex items-center gap-3 text-sm"><Amount v={Number(co.amount)} /><Days d={Number(co.days_impact)} /></span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
+            </div>
 
-      {/* Table — hidden on mobile */}
-      <Card className="hidden sm:block">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : (
-            <>
+            <div className="hidden overflow-x-auto border-t sm:block">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">
+                    <TableHead className="w-10 pl-5">
                       <Checkbox
                         checked={isAllSelected}
                         ref={(el) => { if (el) (el as HTMLButtonElement).dataset.indeterminate = String(isIndeterminate); }}
@@ -219,107 +365,98 @@ export default function ChangeOrdersPage() {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <SortableHeader label="CO #" sortKey="co_number" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Title" sortKey="title" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Category" sortKey="category" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Amount" sortKey="amount" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Days" sortKey="days_impact" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Status" sortKey="status" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <SortableHeader label="Requested By" sortKey="requested_by" currentKey={String(sortKey ?? "")} currentDir={sortDir} onSort={k => toggleSort(k as keyof ChangeOrder)} />
-                    <TableHead className="w-10" />
+                    <SortableHeader label="CO #" sortKey="co_number" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Title" sortKey="title" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Category" sortKey="category" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
+                    <SortableHeader label="Amount" sortKey="amount" currentKey={sk} currentDir={sortDir} onSort={onSort} className="text-right" />
+                    <SortableHeader label="Days" sortKey="days_impact" currentKey={sk} currentDir={sortDir} onSort={onSort} className="text-right" />
+                    <SortableHeader label="Status" sortKey="status" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="Requested by" sortKey="requested_by" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
+                    <TableHead className="w-12 pr-5"><span className="sr-only">Actions</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((co) => (
-                    <TableRow key={co.id} data-selected={selected.has(co.id)}>
-                      <TableCell>
-                        <Checkbox checked={selected.has(co.id)} onCheckedChange={() => toggleSelect(co.id)} />
+                  {isLoading ? <SkeletonRows cols={9} /> : rows.map((co) => (
+                    <TableRow key={co.id} data-state={selected.has(co.id) ? "selected" : undefined} className="group">
+                      <TableCell className="pl-5">
+                        <Checkbox checked={selected.has(co.id)} onCheckedChange={() => toggleSelect(co.id)} aria-label={`Select ${co.co_number}`} />
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{co.co_number}</TableCell>
-                      <TableCell>
-                        <p className="text-sm font-medium">{co.title}</p>
-                        {co.reason && <p className="text-xs text-muted-foreground truncate max-w-xs">{co.reason}</p>}
+                      <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{co.co_number}</TableCell>
+                      <TableCell className="max-w-[300px]">
+                        <p className="truncate font-medium">{co.title}</p>
+                        {co.reason && <p className="truncate text-xs text-muted-foreground">{co.reason}</p>}
                       </TableCell>
-                      <TableCell className="text-sm">{co.category ?? "—"}</TableCell>
-                      <TableCell className="text-sm font-medium">{fmt(Number(co.amount))}</TableCell>
-                      <TableCell className="text-sm text-center">
-                        {Number(co.days_impact) > 0
-                          ? <span className="text-warning">+{co.days_impact}d</span>
-                          : <span className="text-muted-foreground">{co.days_impact}d</span>}
-                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">{co.category ?? "—"}</TableCell>
+                      <TableCell className="text-right"><Amount v={Number(co.amount)} /></TableCell>
+                      <TableCell className="text-right"><Days d={Number(co.days_impact)} /></TableCell>
                       <TableCell>
-                        <Select
-                          value={co.status}
-                          onValueChange={v => updateCO.mutate({ id: co.id, status: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[120px] text-[10px] border-0 p-0">
-                            <Badge variant="outline" className={`text-[10px] ${statusColor[co.status] ?? ""}`}>{co.status}</Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <StatusSelect value={co.status} options={STATUSES} tones={STATUS_TONES} onChange={v => updateCO.mutate({ id: co.id, status: v })} label={`Status for ${co.co_number}`} />
                       </TableCell>
-                      <TableCell className="text-sm">{co.requested_by ?? "—"}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden text-muted-foreground xl:table-cell">{co.requested_by ?? "—"}</TableCell>
+                      <TableCell className="pr-5">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          className="h-7 w-7 text-muted-foreground opacity-60 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
                           onClick={() => setDeleteId(co.id)}
+                          aria-label={`Delete ${co.co_number}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))}
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">
-                        No change orders found.
-                      </TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
-              <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />
-            </>
-          )}
-        </CardContent>
-      </Card>
+              {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
+            </div>
+          </>
+        )}
+      </Panel>
 
-      {/* Create Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Change Order</DialogTitle></DialogHeader>
-          <div className="space-y-3 mt-2">
-            <div><Label className="text-xs">Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
-            <div>
-              <Label className="text-xs">Category</Label>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New change order</DialogTitle>
+            <DialogDescription>Will be logged as <span className="font-mono text-foreground">{nextNumber}</span> and set to Pending. Use a negative amount for credits.</DialogDescription>
+          </DialogHeader>
+          <form className="grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+            <Field label="Title" htmlFor="co-title" required className="sm:col-span-2">
+              <Input id="co-title" autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Added structural bracing at L3" />
+            </Field>
+            <Field label="Category" className="sm:col-span-2">
               <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
-                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Category"><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">Amount ($)</Label><Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} /></div>
-              <div><Label className="text-xs">Days Impact</Label><Input type="number" value={form.days_impact} onChange={e => setForm(f => ({ ...f, days_impact: e.target.value }))} /></div>
-            </div>
-            <div><Label className="text-xs">Reason / Description</Label><Input value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} /></div>
-            <div><Label className="text-xs">Requested By</Label><Input value={form.requested_by} onChange={e => setForm(f => ({ ...f, requested_by: e.target.value }))} /></div>
-            <Button className="w-full" onClick={handleSubmit} disabled={!form.title || createCO.isPending}>
-              {createCO.isPending ? "Creating…" : "Create Change Order"}
-            </Button>
-          </div>
+            </Field>
+            <Field label="Amount (USD)" htmlFor="co-amt" hint={amountPreview ? <span className={cn("font-mono", amountPreview < 0 ? "text-success" : "text-foreground")}>{signed(amountPreview)}{amountPreview < 0 ? " credit" : ""}</span> : undefined}>
+              <Input id="co-amt" type="number" inputMode="decimal" className="font-mono tabular-nums" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" />
+            </Field>
+            <Field label="Schedule impact (days)" htmlFor="co-days">
+              <Input id="co-days" type="number" className="font-mono tabular-nums" value={form.days_impact} onChange={e => setForm(f => ({ ...f, days_impact: e.target.value }))} placeholder="0" />
+            </Field>
+            <Field label="Reason / description" htmlFor="co-reason" className="sm:col-span-2">
+              <Textarea id="co-reason" rows={3} value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="What changed and why" />
+            </Field>
+            <Field label="Requested by" htmlFor="co-req" className="sm:col-span-2">
+              <Input id="co-req" value={form.requested_by} onChange={e => setForm(f => ({ ...f, requested_by: e.target.value }))} placeholder="Owner, architect, GC…" />
+            </Field>
+            <DialogFooter className="gap-2 sm:col-span-2">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!form.title || createCO.isPending}>
+                {createCO.isPending ? "Creating…" : "Create change order"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
       <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Change Order?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Delete {changeOrders.find(c => c.id === deleteId)?.co_number ?? "change order"}?</AlertDialogTitle>
+            <AlertDialogDescription>The change order will be removed permanently and drop out of every total. This can’t be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -327,13 +464,12 @@ export default function ChangeOrdersPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { if (deleteId) { deleteCO.mutate(deleteId); setDeleteId(null); } }}
             >
-              Delete
+              Delete change order
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Action Bar */}
       <BulkActionBar
         count={selectedCount}
         onClear={clearSelection}
