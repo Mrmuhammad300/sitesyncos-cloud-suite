@@ -152,7 +152,6 @@ const BudgetsPage = () => {
               icon={Gauge}
               title="Nothing allocated yet"
               description="Create a budget line to see spend against allocation and remaining runway."
-              action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus />New budget</Button>}
             />
           ) : (
             <>

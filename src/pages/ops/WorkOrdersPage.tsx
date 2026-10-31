@@ -147,7 +147,7 @@ const WorkOrdersPage = () => {
       </section>
 
       {/* ── Priority lanes ───────────────────────────────── */}
-      <Panel
+      {(isLoading || wos.length > 0) && <Panel
         eyebrow="Triage"
         title="Open work by priority"
         actions={<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Timer className="h-3.5 w-3.5" />Sorted by SLA</span>}
@@ -158,9 +158,8 @@ const WorkOrdersPage = () => {
           <EmptyState
             compact
             icon={CheckCircle2}
-            title={wos.length ? "All clear" : "No work orders yet"}
-            description={wos.length ? "Every work order is completed or cancelled." : "Log a maintenance request to start the triage board."}
-            action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus />New work order</Button>}
+            title="All clear"
+            description="Every work order is completed or cancelled."
           />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -215,7 +214,7 @@ const WorkOrdersPage = () => {
             ))}
           </div>
         )}
-      </Panel>
+      </Panel>}
 
       <Panel
         flush

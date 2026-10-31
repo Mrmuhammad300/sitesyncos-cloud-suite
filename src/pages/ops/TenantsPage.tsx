@@ -176,7 +176,7 @@ const TenantsPage = () => {
                 {ladder.buckets.map((b) => (
                   <div key={b.key} className="min-w-0 text-center">
                     <p className="truncate text-[10.5px] font-medium sm:text-[11px]">{b.label}</p>
-                    <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">{b.count} lease{b.count === 1 ? "" : "s"}</p>
+                    <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">{b.count}<span className="hidden sm:inline"> lease{b.count === 1 ? "" : "s"}</span></p>
                   </div>
                 ))}
               </div>
