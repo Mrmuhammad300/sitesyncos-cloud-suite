@@ -33,6 +33,11 @@ const STATUS_TONE: Record<string, StatusTone> = {
   behind: "destructive", overdue: "destructive", rejected: "destructive", failed: "destructive",
   expired: "destructive", critical: "destructive", high: "destructive", urgent: "destructive",
   "non-compliant": "destructive", delinquent: "destructive", error: "destructive", blocked: "destructive",
+  // lifecycle / domain vocabulary
+  stabilized: "success", committed: "info", "under contract": "info", "due diligence": "info", "lease-up": "data",
+  posted: "success", "pending approval": "warning", watch: "warning", resubmit: "warning", emergency: "destructive",
+  superseded: "neutral", terminated: "neutral", "over budget": "destructive", implemented: "success",
+  satisfied: "success", "not started": "neutral", "in_progress": "info", not_started: "neutral",
   // misc
   low: "neutral", inactive: "neutral", archived: "neutral", cancelled: "neutral", canceled: "neutral",
 };

@@ -8,6 +8,8 @@ interface MeterProps {
   tone?: "primary" | "data" | "success" | "warning" | "destructive" | "info";
   className?: string;
   showLabel?: boolean;
+  /** [warn, danger] percentages for `risk` coloring. Default [85, 100]. */
+  thresholds?: [number, number];
 }
 
 const toneBg = {
@@ -20,9 +22,9 @@ const toneBg = {
 } as const;
 
 /** Slim progress/utilisation bar with optional tabular label. */
-export function Meter({ value, max = 100, risk, tone = "primary", className, showLabel }: MeterProps) {
+export function Meter({ value, max = 100, risk, tone = "primary", className, showLabel, thresholds = [85, 100] }: MeterProps) {
   const pct = Math.max(0, Math.min(100, max ? (value / max) * 100 : 0));
-  const t = risk ? (pct >= 100 ? "destructive" : pct >= 85 ? "warning" : "success") : tone;
+  const t = risk ? (pct >= thresholds[1] ? "destructive" : pct >= thresholds[0] ? "warning" : "success") : tone;
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">

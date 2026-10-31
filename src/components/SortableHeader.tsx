@@ -23,7 +23,7 @@ export function SortableHeader({
   const active = currentKey === sortKey;
   return (
     <TableHead
-      className={cn("cursor-pointer select-none transition-colors hover:text-foreground", active && "text-foreground", className)}
+      className={cn("cursor-pointer select-none whitespace-nowrap transition-colors hover:text-foreground", active && "text-foreground", className)}
       onClick={() => onSort(sortKey)}
       aria-sort={active ? (currentDir === "asc" ? "ascending" : "descending") : "none"}
     >
