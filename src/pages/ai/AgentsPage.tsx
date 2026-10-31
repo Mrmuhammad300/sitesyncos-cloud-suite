@@ -219,7 +219,7 @@ export default function AgentsPage() {
               <EmptyState compact icon={Activity} title="No executions yet" description="Every agent run — with its confidence and risk flags — will stream in here." />
             </div>
           ) : (
-            <ExecutionTimeline executions={executions.slice(0, 12)} nameOf={nameOf} agents={agents} />
+            <ExecutionTimeline executions={executions.slice(0, 8)} nameOf={nameOf} agents={agents} />
           )}
         </Panel>
 
@@ -283,7 +283,7 @@ function AgentCard({ agent: a, roll, busy, onToggle }: { agent: Agent; roll?: Ag
         <AutonomyGauge level={auto.level} label={auto.label} />
         <span className={cn("flex shrink-0 items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-wider", live ? "text-success" : "text-muted-foreground")}>
           <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-glow-pulse bg-success" : "bg-muted-foreground/50")} />
-          {roll?.running ? "Running" : live ? "Live" : "Idle"}
+          {!live ? "Idle" : roll?.running ? "Running" : "Live"}
         </span>
       </div>
 
@@ -344,7 +344,7 @@ function ExecutionTimeline({ executions, nameOf, agents }: { executions: Executi
   const byId = new Map(agents.map((a) => [a.agent_id, a]));
   return (
     <ol className="relative border-t px-5 py-2">
-      <span className="absolute bottom-6 left-[29px] top-6 w-px bg-border" aria-hidden />
+      <span className="absolute bottom-7 left-[29px] top-7 w-px bg-gradient-to-b from-border-strong via-border-strong to-transparent" aria-hidden />
       {executions.map((e) => {
         const st = execState(e.status);
         const agent = byId.get(e.agent_id);

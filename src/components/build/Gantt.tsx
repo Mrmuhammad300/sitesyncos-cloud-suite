@@ -30,6 +30,15 @@ export function Gantt({ projects }: { projects: Project[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState(960);
+  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+
+
+  const withDates = useMemo(
+    () => projects
+      .filter((p) => p.start_date && p.end_date)
+      .sort((a, b) => a.start_date!.localeCompare(b.start_date!)),
+    [projects],
+  );
 
   // Fit the timeline to the panel at 100%; zoom stretches it from there.
   useEffect(() => {
@@ -43,14 +52,7 @@ export function Gantt({ projects }: { projects: Project[] }) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-
-  const withDates = useMemo(
-    () => projects
-      .filter((p) => p.start_date && p.end_date)
-      .sort((a, b) => a.start_date!.localeCompare(b.start_date!)),
-    [projects],
-  );
+  }, [withDates.length]);
 
   const { min, totalDays } = useMemo(() => {
     if (withDates.length === 0) return { min: new Date(), totalDays: 1 };
@@ -87,8 +89,22 @@ export function Gantt({ projects }: { projects: Project[] }) {
     return out;
   }, [min, totalDays, width]);
 
-  const todayX = x(new Date());
-  const step = zoom < 0.75 ? 3 : zoom < 1.25 ? 2 : 1; // thin month labels when zoomed out
+  const todayX = x(today);
+  // Decide which month labels fit: years always win, then keep ~44px between labels and clear the Today pill.
+  const visibleMonths = useMemo(() => {
+    const show = new Set<string>();
+    const placed: number[] = [];
+    const fits = (left: number) => placed.every((p) => Math.abs(p - left) >= 44) && Math.abs(left - todayX) >= 34;
+    for (const mo of months) if (mo.year && Math.abs(mo.left - todayX) >= 30) { show.add(mo.key); placed.push(mo.left); }
+    for (const mo of months) if (!mo.year && fits(mo.left)) { show.add(mo.key); placed.push(mo.left); }
+    return show;
+  }, [months, todayX]);
+
+  // Narrow screens: open the chart centred on today.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && el.scrollWidth > el.clientWidth + 8) el.scrollLeft = Math.max(0, todayX - el.clientWidth / 3);
+  }, [todayX]);
 
   const scrollToToday = () => {
     const el = scrollRef.current;
@@ -137,14 +153,14 @@ export function Gantt({ projects }: { projects: Project[] }) {
             <div className="sticky left-0 z-10 flex w-[var(--gantt-label)] shrink-0 items-center border-r bg-surface-1 px-4">
               <span className="ss-eyebrow text-[9.5px]">Project</span>
             </div>
-            <div className="relative" style={{ width }}>
-              {months.map((mo, i) => (
+            <div className="relative isolate" style={{ width }}>
+              {months.map((mo) => (
                 <span
                   key={mo.key}
                   className={cn(
                     "absolute top-1/2 -translate-y-1/2 pl-1.5 font-mono text-[10.5px] uppercase tracking-wider",
                     mo.year ? "font-semibold text-foreground" : "text-muted-foreground",
-                    !mo.year && i % step !== 0 && "hidden",
+                    !visibleMonths.has(mo.key) && "hidden",
                   )}
                   style={{ left: mo.left }}
                 >
@@ -192,7 +208,7 @@ export function Gantt({ projects }: { projects: Project[] }) {
                     type="button"
                     onClick={() => setSelectedId(isSel ? null : p.id)}
                     className={cn(
-                      "sticky left-0 z-10 flex w-[var(--gantt-label)] shrink-0 items-center gap-2.5 border-r bg-card px-4 text-left transition-colors hover:bg-surface-2",
+                      "sticky left-0 z-20 flex w-[var(--gantt-label)] shrink-0 items-center gap-2.5 border-r bg-card px-4 text-left transition-colors hover:bg-surface-2",
                       isSel && "bg-surface-2",
                     )}
                   >
@@ -212,7 +228,7 @@ export function Gantt({ projects }: { projects: Project[] }) {
                     </span>
                   </button>
 
-                  <div className="relative" style={{ width }}>
+                  <div className="relative isolate" style={{ width }}>
                     {milestone ? (
                       <Tooltip>
                         <TooltipTrigger asChild>

@@ -225,9 +225,16 @@ export default function AgentCompliancePage() {
 
   /* Matrix axes */
   const matrixControls = useMemo(
-    () => controls.filter((c) => (frameworkFilter === "all" || c.framework === frameworkFilter) && matchesSearch(c)),
+    () =>
+      controls
+        .filter((c) => (frameworkFilter === "all" || c.framework === frameworkFilter) && matchesSearch(c))
+        .sort((a, b) =>
+          a.framework === b.framework
+            ? a.control_ref.localeCompare(b.control_ref, undefined, { numeric: true })
+            : frameworks.indexOf(a.framework) - frameworks.indexOf(b.framework),
+        ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [controls, frameworkFilter, search],
+    [controls, frameworks, frameworkFilter, search],
   );
   const matrixAgents = useMemo(() => {
     const mapped = new Set(mappings.map((m) => m.agent_id));
@@ -285,7 +292,7 @@ export default function AgentCompliancePage() {
       )}
 
       {/* ── Coverage rings ── */}
-      <section className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <section className="stagger grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
         {loading ? (
           [0, 1, 2, 3, 4, 5].map((i) => <Shimmer key={i} className="h-[132px] rounded-xl" />)
         ) : (
@@ -361,14 +368,14 @@ export default function AgentCompliancePage() {
               <table className="w-full border-separate border-spacing-0 text-left">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-20 min-w-[200px] border-b bg-card px-4 py-3 align-bottom sm:min-w-[300px] sm:px-5">
+                    <th className="sticky left-0 z-20 w-[180px] min-w-[180px] max-w-[180px] border-b bg-card px-4 py-3 align-bottom sm:w-auto sm:min-w-[320px] sm:max-w-none sm:px-5">
                       <span className="ss-eyebrow text-[9.5px]">Control</span>
                     </th>
                     {matrixAgents.map((a) => (
-                      <th key={a.agent_id} className="w-[84px] min-w-[84px] border-b px-1 py-3 align-bottom">
+                      <th key={a.agent_id} className="w-[96px] min-w-[84px] border-b px-1 py-3 align-bottom">
                         <div className="flex flex-col items-center gap-1.5" title={a.name}>
                           <AgentGlyph icon={agentGlyph(a)} size="sm" live={a.is_active} />
-                          <span className="max-w-[78px] truncate text-center text-[10.5px] font-medium leading-tight text-muted-foreground">{a.name}</span>
+                          <span className="max-w-[90px] truncate text-center text-[10.5px] font-medium leading-tight text-muted-foreground">{a.name}</span>
                         </div>
                       </th>
                     ))}
@@ -385,8 +392,8 @@ export default function AgentCompliancePage() {
                     return (
                       <FragmentRow key={c.id} groupStart={groupStart && frameworkFilter === "all"} framework={c.framework} span={matrixAgents.length + 2}>
                         <tr className="group">
-                          <th scope="row" className="sticky left-0 z-10 border-b border-border/60 bg-card px-4 py-2.5 font-normal transition-colors group-hover:bg-surface-2 sm:px-5">
-                            <div className="flex min-w-0 items-baseline gap-2.5">
+                          <th scope="row" className="sticky left-0 z-10 w-[180px] min-w-[180px] max-w-[180px] border-b border-border/60 bg-card px-4 py-2.5 font-normal shadow-[1px_0_0_0_hsl(var(--border))] transition-colors group-hover:bg-surface-2 sm:w-auto sm:max-w-none sm:px-5 sm:shadow-none">
+                            <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
                               <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{c.control_ref}</span>
                               <span className="truncate text-[13px]">{c.title}</span>
                             </div>
@@ -614,11 +621,20 @@ function CoverageCard({
             { value: c.gaps, className: "stroke-destructive" },
           ] : undefined}
         />
-        <div className="min-w-0 space-y-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-          <p><span className="text-foreground">{c.satisfied}</span>/{c.total} met</p>
-          <p className={cn(c.gaps > 0 && "text-destructive")}>{c.gaps} gap{c.gaps === 1 ? "" : "s"}</p>
-          <p className={cn(c.unverified > 0 && "text-warning")}>{c.unverified} unverified</p>
+        <div className="min-w-0">
+          <p className="font-mono text-xl font-medium leading-none tabular-nums">
+            {c.satisfied}<span className="text-sm text-muted-foreground">/{c.total}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">controls met</p>
         </div>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10.5px] tabular-nums">
+        <span className={cn("flex items-center gap-1", c.gaps ? "text-destructive" : "text-muted-foreground")}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />{c.gaps} gap{c.gaps === 1 ? "" : "s"}
+        </span>
+        <span className={cn("flex items-center gap-1", c.unverified ? "text-warning" : "text-muted-foreground")}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />{c.unverified} unverified
+        </span>
       </div>
     </button>
   );

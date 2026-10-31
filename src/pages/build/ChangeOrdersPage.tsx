@@ -251,7 +251,7 @@ export default function ChangeOrdersPage() {
             actions={
               <div className="hidden items-center gap-3 text-[11px] text-muted-foreground sm:flex">
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-primary" />Approved</span>
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-warning/60" />Pending</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-warning" />Pending</span>
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-success" />Credit</span>
               </div>
             }
@@ -268,7 +268,7 @@ export default function ChangeOrdersPage() {
                       <span className="truncate text-xs text-muted-foreground" title={c.name}>{c.name}</span>
                       <div className="flex h-2.5 overflow-hidden rounded-full bg-secondary">
                         {c.approved !== 0 && <div className={cn("h-full", c.approved < 0 ? "bg-success" : "bg-primary")} style={{ width: `${aw}%` }} />}
-                        {c.pending !== 0 && <div className={cn("h-full", c.pending < 0 ? "bg-success/50" : "bg-warning/60")} style={{ width: `${pw}%` }} />}
+                        {c.pending !== 0 && <div className={cn("h-full", c.pending < 0 ? "bg-success/60" : "bg-warning")} style={{ width: `${pw}%` }} />}
                       </div>
                       <span className={cn("text-right font-mono text-xs tabular-nums", c.total < 0 && "text-success")}>{signed(c.total)}</span>
                     </li>
@@ -276,6 +276,17 @@ export default function ChangeOrdersPage() {
                 })}
               </ul>
             )}
+            {m.byCategory.length > 0 && (() => {
+              const gross = m.byCategory.reduce((s, c) => s + Math.abs(c.total), 0);
+              const top = m.byCategory[0];
+              const share = gross ? Math.round((Math.abs(top.total) / gross) * 100) : 0;
+              return (
+                <p className="mt-5 border-t pt-4 text-xs text-muted-foreground">
+                  <span className="text-foreground">{top.name}</span> drives <span className="font-mono tabular-nums text-foreground">{share}%</span> of gross exposure
+                  {top.pending !== 0 && <> — <span className="font-mono tabular-nums text-warning">{signed(top.pending)}</span> of it still pending</>}.
+                </p>
+              );
+            })()}
           </Panel>
         </section>
       )}
@@ -353,7 +364,7 @@ export default function ChangeOrdersPage() {
               {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
             </div>
 
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -173,9 +173,9 @@ export default function PunchListPage() {
         />
         <StatCard
           label="Closed out"
-          value={`${m.completionPct}%`}
+          value={punchItems.length ? `${m.completionPct}%` : "—"}
           icon={CheckSquare}
-          tone="success"
+          tone={punchItems.length ? "success" : "default"}
           hint={`${m.completedCount} of ${punchItems.length} complete`}
           loading={isLoading}
         />
@@ -195,7 +195,7 @@ export default function PunchListPage() {
               </ProgressRing>
               <div className="space-y-1">
                 <p className="text-sm font-medium">Overall</p>
-                <p className="font-mono text-xs tabular-nums text-muted-foreground">{m.completedCount}/{punchItems.length} items closed</p>
+                <p className="font-mono text-xs tabular-nums text-muted-foreground">{m.completedCount} of {punchItems.length} closed</p>
                 <p className="text-xs text-muted-foreground">{m.remaining.length ? `${m.remaining.length} to go` : "Ready for handover"}</p>
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function PunchListPage() {
               {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
             </div>
 
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>

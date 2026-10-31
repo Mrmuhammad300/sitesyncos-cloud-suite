@@ -127,7 +127,7 @@ export default function SubmittalsPage() {
     const order = [...STATUSES, ...Array.from(new Set(submittals.map(s => s.status))).filter(s => !(STATUSES as readonly string[]).includes(s))];
     const segments = order
       .map(s => ({ key: s, label: s, value: submittals.filter(x => x.status === s).length, tone: toneFor(s) }))
-      .filter(s => s.value > 0 || (STATUSES as readonly string[]).includes(s.key));
+      .filter(s => s.value > 0);
     return { inReview, approved, rejected, approvalRate, awaiting, overdue, resubmitted, segments };
   }, [submittals]);
 
@@ -204,7 +204,7 @@ export default function SubmittalsPage() {
       />
 
       <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="In the log" value={submittals.length} icon={ClipboardList} tone="primary" hint={`${m.awaiting.length} awaiting decision`} loading={isLoading} />
+        <StatCard label="In the log" value={submittals.length} icon={ClipboardList} tone="primary" hint={`${m.awaiting.length} awaiting · ${m.resubmitted} resubmitted`} loading={isLoading} />
         <StatCard label="In review" value={m.inReview} icon={ScanEye} tone="info" hint="With the design team" loading={isLoading} />
         <StatCard
           label="Approved"
@@ -219,7 +219,7 @@ export default function SubmittalsPage() {
           value={m.overdue}
           icon={AlarmClock}
           tone={m.overdue ? "destructive" : "success"}
-          hint={m.resubmitted ? `${m.resubmitted} on a resubmission` : "No resubmissions"}
+          hint={m.overdue ? "Review past its due date" : "Nothing past due"}
           loading={isLoading}
         />
       </section>
@@ -299,7 +299,7 @@ export default function SubmittalsPage() {
               {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
             </div>
 
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>

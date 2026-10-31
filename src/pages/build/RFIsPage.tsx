@@ -308,7 +308,7 @@ export default function RFIsPage() {
               {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
             </div>
 
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -320,11 +320,11 @@ export default function RFIsPage() {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <SortableHeader label="RFI #" sortKey="rfi_number" currentKey={sk} currentDir={sortDir} onSort={onSort} />
+                    <SortableHeader label="RFI #" sortKey="rfi_number" currentKey={sk} currentDir={sortDir} onSort={onSort} className="whitespace-nowrap" />
                     <SortableHeader label="Subject" sortKey="subject" currentKey={sk} currentDir={sortDir} onSort={onSort} />
                     <SortableHeader label="Priority" sortKey="priority" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
                     <SortableHeader label="Status" sortKey="status" currentKey={sk} currentDir={sortDir} onSort={onSort} />
-                    <SortableHeader label="Ball in court" sortKey="assigned_to" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
+                    <SortableHeader label="Ball in court" sortKey="assigned_to" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden whitespace-nowrap lg:table-cell" />
                     <SortableHeader label="Due" sortKey="due_date" currentKey={sk} currentDir={sortDir} onSort={onSort} />
                     <SortableHeader label="Age" sortKey="created_at" currentKey={sk} currentDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
                     <TableHead className="w-12 pr-5"><span className="sr-only">Actions</span></TableHead>
@@ -349,7 +349,7 @@ export default function RFIsPage() {
                       <TableCell>
                         <StatusSelect value={rfi.status} options={STATUSES} onChange={v => updateRFI.mutate({ id: rfi.id, status: v })} label={`Status for ${rfi.rfi_number}`} />
                       </TableCell>
-                      <TableCell className="hidden text-muted-foreground lg:table-cell">{rfi.assigned_to ?? "—"}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">{rfi.assigned_to ?? "—"}</TableCell>
                       <TableCell><DueChip date={rfi.due_date} done={isResolved(rfi)} /></TableCell>
                       <TableCell className="hidden xl:table-cell"><Aging r={rfi} /></TableCell>
                       <TableCell className="pr-5">

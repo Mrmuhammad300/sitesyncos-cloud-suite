@@ -314,7 +314,7 @@ export default function ProjectsPage() {
             </div>
 
             {/* Desktop table */}
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>

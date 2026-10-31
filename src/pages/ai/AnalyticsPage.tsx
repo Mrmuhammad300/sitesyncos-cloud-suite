@@ -8,11 +8,12 @@ import { Activity, BarChart3, CircleDollarSign, FileQuestion, FileText, HardHat,
 import { Button } from "@/components/ui/button";
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/os";
 import { ChartLegend, Shimmer } from "@/components/ai/primitives";
+import { prefersReducedMotion } from "@/components/ai/agent-meta";
 import { useChangeOrders, useProjects, useRFIs } from "@/hooks/useProjectData";
 import { useBudgets } from "@/hooks/useOpsData";
 import { CHART, STATUS_CHART_COLOR, axisProps, gridProps, tooltipProps } from "@/lib/chart";
 import { PROJECT_STATUSES, budgetBurn } from "@/lib/dashboard";
-import { fmtDollar } from "@/lib/utils";
+import { cn, fmtDollar } from "@/lib/utils";
 
 const CO_TONE: Record<string, string> = {
   approved: CHART.success,
@@ -34,6 +35,17 @@ const PRIORITIES = ["High", "Medium", "Low"] as const;
 
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const money = (v: number) => fmtDollar(v);
+
+/** Single-line, truncated category label for horizontal bar charts. */
+function NameTick({ x, y, payload, max = 16 }: { x?: number; y?: number; payload?: { value: string }; max?: number }) {
+  const v = payload?.value ?? "";
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fontSize={12} className="fill-foreground">
+      <title>{v}</title>
+      {short(v, max)}
+    </text>
+  );
+}
 
 export default function AnalyticsPage() {
   const { data: projects = [], isLoading: pLoading } = useProjects();
@@ -65,7 +77,7 @@ export default function AnalyticsPage() {
       .slice(0, 8)
       .map((p) => ({
         name: p.name,
-        label: short(p.name, 18),
+        label: p.name,
         budget: Number(p.budget),
         actual: Number(p.spent),
         burn: budgetBurn(p),
@@ -95,7 +107,9 @@ export default function AnalyticsPage() {
         };
       })
       .filter((d) => d.count > 0);
-    const coNet = coByStatus.reduce((s, d) => s + d.value, 0);
+    // Net exposure excludes rejected change orders.
+    const coNet = coByStatus.filter((d) => d.name.toLowerCase() !== "rejected").reduce((s, d) => s + d.value, 0);
+    const coLive = coByStatus.filter((d) => d.name.toLowerCase() !== "rejected").reduce((s, d) => s + d.count, 0);
 
     // Budget utilization by category
     const budgetCategoryData = [...budgets]
@@ -103,7 +117,7 @@ export default function AnalyticsPage() {
       .slice(0, 8)
       .map((b) => ({
         name: b.category,
-        label: short(b.category, 16),
+        label: b.category,
         budget: Number(b.allocated),
         actual: Number(b.spent),
         util: Number(b.allocated) > 0 ? Math.round((Number(b.spent) / Number(b.allocated)) * 100) : 0,
@@ -119,11 +133,12 @@ export default function AnalyticsPage() {
 
     return {
       totalBudget, totalSpent, consumed, openRFIs, criticalRFIs, avgProgress, onTimeRate, statusCounts, budgetData,
-      burnData, ahead, coByStatus, coNet, budgetCategoryData, rfiStack, rfiStatusesPresent,
+      burnData, ahead, coByStatus, coNet, coLive, budgetCategoryData, rfiStack, rfiStatusesPresent,
     };
   }, [projects, rfis, changeOrders, budgets]);
 
-  const bulletH = (n: number) => Math.max(n, 1) * 38 + 24;
+  const bulletH = (n: number) => Math.max(n, 1) * 36 + 28;
+  const anim = !prefersReducedMotion();
 
   return (
     <div className="space-y-6">
@@ -186,14 +201,14 @@ export default function AnalyticsPage() {
                 <BarChart data={m.budgetData} layout="vertical" margin={{ top: 0, right: 44, left: 0, bottom: 0 }} barGap={-12} barCategoryGap={10}>
                   <CartesianGrid {...gridProps} vertical horizontal={false} />
                   <XAxis type="number" {...axisProps} tickFormatter={(v) => money(v)} />
-                  <YAxis type="category" dataKey="label" {...axisProps} width={112} tick={{ ...axisProps.tick, fontFamily: "inherit", fill: "hsl(var(--foreground))" }} />
+                  <YAxis type="category" dataKey="label" {...axisProps} width={128} tick={<NameTick max={18} />} />
                   <Tooltip
                     {...tooltipProps}
                     labelFormatter={(_l, p) => p?.[0]?.payload?.name ?? ""}
                     formatter={(v: number, k) => [money(v), k === "budget" ? "Budget" : "Spent"]}
                   />
                   <Bar dataKey="budget" fill={CHART.grid} radius={4} barSize={12} isAnimationActive={false} />
-                  <Bar dataKey="actual" fill={CHART.data} radius={4} barSize={12}>
+                  <Bar dataKey="actual" fill={CHART.data} radius={4} barSize={12} isAnimationActive={anim}>
                     <LabelList dataKey="burn" position="right" formatter={(v: number) => `${v}%`} className="fill-muted-foreground font-mono text-[10.5px]" />
                   </Bar>
                 </BarChart>
@@ -211,7 +226,7 @@ export default function AnalyticsPage() {
               <div className="relative mx-auto h-[180px] w-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={m.statusCounts.filter((s) => s.value > 0)} dataKey="value" nameKey="name" innerRadius={62} outerRadius={86} paddingAngle={3} stroke="none" startAngle={90} endAngle={-270}>
+                    <Pie isAnimationActive={anim} data={m.statusCounts.filter((s) => s.value > 0)} dataKey="value" nameKey="name" innerRadius={62} outerRadius={86} paddingAngle={3} stroke="none" startAngle={90} endAngle={-270}>
                       {m.statusCounts.filter((s) => s.value > 0).map((s) => <Cell key={s.name} fill={s.color} />)}
                     </Pie>
                     <Tooltip {...tooltipProps} />
@@ -249,10 +264,10 @@ export default function AnalyticsPage() {
           ) : (
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 10, right: 12, left: -12, bottom: 4 }}>
+                <ScatterChart margin={{ top: 10, right: 12, left: -4, bottom: 4 }}>
                   <CartesianGrid {...gridProps} vertical />
-                  <XAxis type="number" dataKey="progress" name="Progress" domain={[0, 100]} unit="%" {...axisProps} />
-                  <YAxis type="number" dataKey="burn" name="Budget burn" domain={[0, 110]} unit="%" {...axisProps} width={48} />
+                  <XAxis type="number" dataKey="progress" name="Progress" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" {...axisProps} />
+                  <YAxis type="number" dataKey="burn" name="Budget burn" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" {...axisProps} width={48} allowDataOverflow={false} />
                   <ZAxis type="number" dataKey="budget" range={[60, 360]} />
                   <ReferenceLine
                     segment={[{ x: 0, y: 0 }, { x: 100, y: 100 }]}
@@ -277,7 +292,7 @@ export default function AnalyticsPage() {
                       );
                     }}
                   />
-                  <Scatter data={m.burnData} fillOpacity={0.85}>
+                  <Scatter data={m.burnData} fillOpacity={0.85} isAnimationActive={anim}>
                     {m.burnData.map((d) => <Cell key={d.name} fill={STATUS_CHART_COLOR[d.status] ?? CHART.muted} />)}
                   </Scatter>
                 </ScatterChart>
@@ -311,6 +326,7 @@ export default function AnalyticsPage() {
                       fill={s.color}
                       radius={i === m.rfiStatusesPresent.length - 1 ? [4, 4, 0, 0] : 0}
                       maxBarSize={56}
+                      isAnimationActive={anim}
                     />
                   ))}
                 </BarChart>
@@ -324,7 +340,7 @@ export default function AnalyticsPage() {
           className="lg:col-span-7"
           eyebrow="Cost codes"
           title="Budget utilization by category"
-          actions={<ChartLegend className="hidden sm:flex" items={[{ label: "Allocated", color: CHART.grid }, { label: "Spent", color: CHART.primary }]} />}
+          actions={<ChartLegend className="hidden sm:flex" items={[{ label: "Allocated", color: CHART.grid }, { label: "Spent", color: CHART.data }, { label: "≥ 85%", color: CHART.warning }]} />}
         >
           {bLoading ? <Shimmer className="h-[300px]" /> : m.budgetCategoryData.length === 0 ? (
             <EmptyState compact icon={CircleDollarSign} title="No budget lines" description="Add budget categories in Ops to track utilization." />
@@ -334,16 +350,16 @@ export default function AnalyticsPage() {
                 <BarChart data={m.budgetCategoryData} layout="vertical" margin={{ top: 0, right: 44, left: 0, bottom: 0 }} barGap={-12} barCategoryGap={10}>
                   <CartesianGrid {...gridProps} vertical horizontal={false} />
                   <XAxis type="number" {...axisProps} tickFormatter={(v) => money(v)} />
-                  <YAxis type="category" dataKey="label" {...axisProps} width={112} tick={{ ...axisProps.tick, fontFamily: "inherit", fill: "hsl(var(--foreground))" }} />
+                  <YAxis type="category" dataKey="label" {...axisProps} width={128} tick={<NameTick max={18} />} />
                   <Tooltip
                     {...tooltipProps}
                     labelFormatter={(_l, p) => p?.[0]?.payload?.name ?? ""}
                     formatter={(v: number, k) => [money(v), k === "budget" ? "Allocated" : "Spent"]}
                   />
                   <Bar dataKey="budget" fill={CHART.grid} radius={4} barSize={12} isAnimationActive={false} />
-                  <Bar dataKey="actual" radius={4} barSize={12}>
+                  <Bar dataKey="actual" radius={4} barSize={12} isAnimationActive={anim}>
                     {m.budgetCategoryData.map((d) => (
-                      <Cell key={d.name} fill={d.util >= 95 ? CHART.destructive : d.util >= 85 ? CHART.warning : CHART.primary} />
+                      <Cell key={d.name} fill={d.util >= 95 ? CHART.destructive : d.util >= 85 ? CHART.warning : CHART.data} />
                     ))}
                     <LabelList dataKey="util" position="right" formatter={(v: number) => `${v}%`} className="fill-muted-foreground font-mono text-[10.5px]" />
                   </Bar>
@@ -358,14 +374,22 @@ export default function AnalyticsPage() {
           className="lg:col-span-5"
           eyebrow="Change orders"
           title="Value by status"
-          actions={changeOrders.length ? (
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">net <span className="text-foreground">{money(m.coNet)}</span></span>
-          ) : undefined}
         >
           {coLoading ? <Shimmer className="h-[220px]" /> : m.coByStatus.length === 0 ? (
             <EmptyState compact icon={FileText} title="No change orders" description="Change order exposure by status will appear here." />
           ) : (
-            <ul className="space-y-3.5 pt-1">
+            <div className="space-y-5">
+            <div className="flex items-end justify-between gap-4 border-b pb-4">
+              <div>
+                <p className={cn("font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums", m.coNet > 0 ? "text-foreground" : "text-success")}>{money(m.coNet)}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  net exposure · {m.coLive} live change order{m.coLive === 1 ? "" : "s"}
+                  {m.totalBudget > 0 && <> · <span className="font-mono">{((m.coNet / m.totalBudget) * 100).toFixed(2)}%</span> of budget</>}
+                </p>
+              </div>
+              <FileText className="mb-1 h-5 w-5 text-muted-foreground/60" />
+            </div>
+            <ul className="space-y-3.5">
               {(() => {
                 const max = Math.max(...m.coByStatus.map((d) => Math.abs(d.value)), 1);
                 return m.coByStatus.map((d) => (
@@ -385,6 +409,7 @@ export default function AnalyticsPage() {
                 ));
               })()}
             </ul>
+            </div>
           )}
         </Panel>
       </section>

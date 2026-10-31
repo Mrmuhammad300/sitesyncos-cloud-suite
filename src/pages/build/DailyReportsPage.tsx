@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { LucideIcon } from "lucide-react";
 import {
   Plus, Trash2, Download, Printer, Users, Clock, ShieldCheck, ShieldAlert, ClipboardPen, SearchX, Timer,
@@ -142,7 +142,8 @@ export default function DailyReportsPage() {
       day: new Date(`${r.report_date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       crew: r.crew_count,
       hours: r.work_hours,
-      delay: r.delay_hours,
+      weather: r.weather ?? "—",
+      color: r.safety_incidents > 0 ? CHART.destructive : isWet(r.weather) ? CHART.info : CHART.primary,
     }));
     const wetDays = recent.filter(r => isWet(r.weather)).length;
     return {
@@ -312,21 +313,25 @@ export default function DailyReportsPage() {
             actions={
               <div className="hidden items-center gap-4 text-[11px] text-muted-foreground sm:flex">
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-primary" />Crew</span>
-                <span className="flex items-center gap-1.5"><span className="h-0.5 w-3 rounded bg-data" />Hours</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-info" />Wet weather</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-destructive" />Incident</span>
               </div>
             }
           >
             <div className="h-[240px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={m.chart} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <BarChart data={m.chart} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
                   <CartesianGrid {...gridProps} />
                   <XAxis dataKey="day" {...axisProps} interval="preserveStartEnd" minTickGap={12} />
-                  <YAxis yAxisId="crew" {...axisProps} width={44} allowDecimals={false} />
-                  <YAxis yAxisId="hours" orientation="right" hide />
-                  <Tooltip {...tooltipProps} formatter={(v: number, name) => [name === "hours" ? `${v}h` : v, name === "hours" ? "Work hours" : "Crew"]} />
-                  <Bar yAxisId="crew" dataKey="crew" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Line yAxisId="hours" type="monotone" dataKey="hours" stroke={CHART.data} strokeWidth={1.75} dot={{ r: 2.5, fill: CHART.data, strokeWidth: 0 }} />
-                </ComposedChart>
+                  <YAxis {...axisProps} width={44} allowDecimals={false} domain={[0, (max: number) => Math.ceil(max / 10) * 10]} tickCount={5} />
+                  <Tooltip
+                    {...tooltipProps}
+                    formatter={(v: number, _n, item) => [`${v} crew · ${(item?.payload as { hours: number }).hours}h · ${(item?.payload as { weather: string }).weather}`, "On site"]}
+                  />
+                  <Bar dataKey="crew" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+                    {m.chart.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </Panel>
@@ -401,7 +406,7 @@ export default function DailyReportsPage() {
               {!isLoading && <TablePagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPage={setPage} />}
             </div>
 
-            <div className="hidden overflow-x-auto border-t sm:block">
+            <div className="hidden overflow-x-auto border-t sm:block [&_th]:whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>

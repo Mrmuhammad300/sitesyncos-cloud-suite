@@ -107,7 +107,8 @@ export default function SimulatorPage() {
   const [materialChange, setMaterialChange] = useState([0]);
   const [weatherDelay, setWeatherDelay] = useState([0]);
   const [scope, setScope] = useState("portfolio");
-  const [results, setResults] = useState<Results | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+  const [runId, setRunId] = useState(0);
 
   const active = useMemo(() => projects.filter((p) => p.status !== "Complete"), [projects]);
   const inScope = useMemo(() => (scope === "portfolio" ? active : active.filter((p) => p.id === scope)), [active, scope]);
@@ -116,11 +117,15 @@ export default function SimulatorPage() {
   const basis = nominal ? NOMINAL_BASIS : remaining;
 
   const params: Params = { labor: laborChange[0], material: materialChange[0], weather: weatherDelay[0], scope };
+  // Once run, the forecast tracks the inputs live (2,000 samples is cheap).
+  const results = useMemo(
+    () => (hasRun ? simulate({ labor: laborChange[0], material: materialChange[0], weather: weatherDelay[0], scope }, basis, nominal) : null),
+    [hasRun, laborChange, materialChange, weatherDelay, scope, basis, nominal],
+  );
   const scenario = (Object.keys(TEMPLATES) as TemplateKey[]).find((k) => {
     const t = TEMPLATES[k];
     return t.labor === params.labor && t.material === params.material && t.weather === params.weather;
   });
-  const stale = !!results && (results.params.labor !== params.labor || results.params.material !== params.material || results.params.weather !== params.weather || results.params.scope !== params.scope);
 
   const applyTemplate = (k: TemplateKey) => {
     const t = TEMPLATES[k];
@@ -129,8 +134,8 @@ export default function SimulatorPage() {
     setWeatherDelay([t.weather]);
   };
 
-  const runSimulation = () => setResults(simulate(params, basis, nominal));
-  const reset = () => { setLaborChange([0]); setMaterialChange([0]); setWeatherDelay([0]); setScope("portfolio"); setResults(null); };
+  const runSimulation = () => { setHasRun(true); setRunId((n) => n + 1); };
+  const reset = () => { setLaborChange([0]); setMaterialChange([0]); setWeatherDelay([0]); setScope("portfolio"); setHasRun(false); };
 
   const projectImpact = useMemo(() => {
     if (!results || results.nominal) return [];
@@ -166,7 +171,7 @@ export default function SimulatorPage() {
         <Panel eyebrow="Inputs" title="Scenario" className="lg:sticky lg:top-6">
           <div className="space-y-6">
             <div className="space-y-2.5">
-              <Label className="ss-eyebrow">Template</Label>
+              <p className="ss-eyebrow">Template</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
                   <button
@@ -187,7 +192,7 @@ export default function SimulatorPage() {
             </div>
 
             <div className="space-y-2.5">
-              <Label className="ss-eyebrow">Scope</Label>
+              <p className="ss-eyebrow">Scope</p>
               <Select value={scope} onValueChange={setScope}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -209,7 +214,7 @@ export default function SimulatorPage() {
 
             <Button className="w-full" onClick={runSimulation}><Play />{results ? "Re-run" : "Run"} simulation</Button>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Labor is modeled as {LABOR_SHARE * 100}% and materials as {MATERIAL_SHARE * 100}% of remaining cost. Each weather day adds ~1.5 schedule days.
+              Labor is modeled as {Math.round(LABOR_SHARE * 100)}% and materials as {Math.round(MATERIAL_SHARE * 100)}% of remaining cost. Results update live once you run. Each weather day adds ~1.5 schedule days.
             </p>
           </div>
         </Panel>
@@ -217,8 +222,10 @@ export default function SimulatorPage() {
         {/* ── Outcomes ── */}
         <div className="min-w-0 space-y-3">
           {!results ? (
-            <Panel>
+            <Panel className="relative overflow-hidden lg:min-h-[640px]" bodyClassName="flex items-center justify-center">
+              <GhostDistribution />
               <EmptyState
+                className="relative w-full border-0"
                 icon={Compass}
                 title="Set a scenario, then run it"
                 description="Pick a template or dial in your own shocks. We'll simulate 2,000 outcomes against your cost-to-complete and show the spread."
@@ -227,15 +234,7 @@ export default function SimulatorPage() {
             </Panel>
           ) : (
             <>
-              {stale && (
-                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/25 bg-warning/5 px-4 py-2.5 text-[13px]">
-                  <span className="h-1.5 w-1.5 animate-glow-pulse rounded-full bg-warning" />
-                  Inputs changed since the last run.
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={runSimulation}><Play />Re-run</Button>
-                </div>
-              )}
-
-              <Panel glow eyebrow={`Outcome · ${results.params.scope === "portfolio" ? "portfolio" : inScope[0]?.name ?? "project"}`} title="Median forecast" className={cn(stale && "opacity-70 transition-opacity")}>
+              <Panel glow eyebrow={`Outcome · ${results.params.scope === "portfolio" ? "portfolio" : inScope[0]?.name ?? "project"}`} title="Median forecast" key={runId} className="animate-fade-in" actions={<span className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground"><span className="h-1.5 w-1.5 animate-glow-pulse rounded-full bg-mod-ai" />Live</span>}>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <BigNumber
                     icon={CircleDollarSign}
@@ -281,7 +280,7 @@ export default function SimulatorPage() {
                   </span>
                 }
               >
-                <div className={cn("h-[240px]", stale && "opacity-70")}>
+                <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={results.histogram} margin={{ top: 18, right: 8, left: -20, bottom: 0 }} barCategoryGap={1}>
                       <CartesianGrid {...gridProps} />
@@ -292,7 +291,7 @@ export default function SimulatorPage() {
                         labelFormatter={(v: number) => `≈ ${signed(v)}`}
                         formatter={(v: number) => [`${v} runs (${((v / SAMPLES) * 100).toFixed(1)}%)`, "Frequency"]}
                       />
-                      <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                      <Bar dataKey="count" radius={[2, 2, 0, 0]} isAnimationActive={false}>
                         {results.histogram.map((b, i) => <Cell key={i} fill={b.mid < 0 ? CHART.success : CHART.data} fillOpacity={0.85} />)}
                       </Bar>
                       <ReferenceLine x={results.cost.p10} stroke={CHART.muted} strokeDasharray="3 3" label={{ value: "P10", position: "top", fill: CHART.muted, fontSize: 10 }} />
@@ -354,6 +353,8 @@ function ParamSlider({
   label, value, onChange, min, max, format, centered,
 }: { label: string; value: number[]; onChange: (v: number[]) => void; min: number; max: number; format: (v: number) => string; centered?: boolean }) {
   const v = value[0];
+  const pct = ((v - min) / (max - min)) * 100;
+  const originPct = centered ? ((0 - min) / (max - min)) * 100 : 0;
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -367,9 +368,23 @@ function ParamSlider({
           {format(v)}
         </span>
       </div>
-      <div className="relative">
-        {centered && <span className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-3.5 w-px -translate-y-1/2 bg-border-strong" aria-hidden />}
-        <Slider value={value} onValueChange={onChange} min={min} max={max} step={1} aria-label={label} />
+      <div className="relative flex h-5 items-center">
+        <div className="pointer-events-none absolute inset-x-0 h-2 overflow-hidden rounded-full bg-secondary" aria-hidden>
+          <div
+            className={cn("absolute inset-y-0 transition-[left,width] duration-150", v > 0 ? "bg-warning" : "bg-success")}
+            style={{ left: `${Math.min(originPct, pct)}%`, width: `${Math.abs(pct - originPct)}%` }}
+          />
+          {centered && <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border-strong" />}
+        </div>
+        <Slider
+          value={value}
+          onValueChange={onChange}
+          min={min}
+          max={max}
+          step={1}
+          aria-label={label}
+          className="[&>span:first-child>span]:bg-transparent [&>span:first-child]:bg-transparent"
+        />
       </div>
       <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground/80">
         <span>{format(min)}</span>
@@ -395,6 +410,22 @@ function MiniStat({ icon: Icon, label, children }: { icon: React.ElementType; la
     <div className="min-w-0 bg-card p-3">
       <p className="flex items-center gap-1 truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground"><Icon className="h-3 w-3 shrink-0" />{label}</p>
       <div className="mt-1 font-mono text-xl font-medium tabular-nums">{children}</div>
+    </div>
+  );
+}
+
+/** Decorative bell-curve silhouette behind the pre-run empty state. */
+function GhostDistribution() {
+  const bars = Array.from({ length: 36 }, (_, i) => {
+    const x = (i - 17.5) / 6.5;
+    return Math.exp(-0.5 * x * x);
+  });
+  return (
+    <div className="pointer-events-none absolute inset-x-8 bottom-8 flex h-40 items-end gap-1 opacity-60 [mask-image:linear-gradient(to_top,black,transparent)]" aria-hidden>
+      {bars.map((h, i) => (
+        <span key={i} className="flex-1 rounded-t-[2px] bg-mod-ai/15" style={{ height: `${8 + h * 92}%` }} />
+      ))}
+      <span className="absolute inset-y-0 left-1/2 w-px bg-mod-ai/30" />
     </div>
   );
 }

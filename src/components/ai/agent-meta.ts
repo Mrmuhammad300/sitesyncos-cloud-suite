@@ -155,3 +155,8 @@ export function humanize(s: string | null | undefined): string {
   if (!s) return "—";
   return s.replace(/[_.]+/g, " ").replace(/\s+/g, " ").trim();
 }
+
+/** True when the viewer asked for reduced motion — charts skip their entry animation. */
+export function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
