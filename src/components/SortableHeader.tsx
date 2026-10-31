@@ -23,10 +23,11 @@ export function SortableHeader({
   const active = currentKey === sortKey;
   return (
     <TableHead
-      className={cn("cursor-pointer select-none text-xs", className)}
+      className={cn("cursor-pointer select-none transition-colors hover:text-foreground", active && "text-foreground", className)}
       onClick={() => onSort(sortKey)}
+      aria-sort={active ? (currentDir === "asc" ? "ascending" : "descending") : "none"}
     >
-      <div className="flex items-center gap-1">
+      <div className="group/sort inline-flex items-center gap-1">
         {label}
         {active ? (
           currentDir === "asc" ? (
@@ -35,7 +36,7 @@ export function SortableHeader({
             <ArrowDown className="h-3 w-3 text-primary" />
           )
         ) : (
-          <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+          <ArrowUpDown className="h-3 w-3 text-muted-foreground/30 transition-colors group-hover/sort:text-muted-foreground" />
         )}
       </div>
     </TableHead>

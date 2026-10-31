@@ -22,9 +22,9 @@ export function TablePagination({
   const to = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-muted-foreground">
-      <span>
-        {from}–{to} of {total}
+    <div className="flex items-center justify-between gap-3 border-t px-4 py-2.5 text-xs text-muted-foreground">
+      <span className="font-mono tabular-nums">
+        {from}–{to} <span className="text-muted-foreground/60">of</span> {total}
       </span>
       <div className="flex items-center gap-1">
         <Button
@@ -33,6 +33,7 @@ export function TablePagination({
           className="h-7 w-7"
           disabled={page === 1}
           onClick={() => onPage(page - 1)}
+          aria-label="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -54,9 +55,9 @@ export function TablePagination({
             ) : (
               <Button
                 key={p}
-                variant={p === page ? "default" : "ghost"}
+                variant={p === page ? "secondary" : "ghost"}
                 size="icon"
-                className="h-7 w-7 text-xs"
+                className={`h-7 w-7 font-mono text-xs tabular-nums ${p === page ? "text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]" : ""}`}
                 onClick={() => onPage(p as number)}
               >
                 {p}
@@ -69,6 +70,7 @@ export function TablePagination({
           className="h-7 w-7"
           disabled={page === totalPages}
           onClick={() => onPage(page + 1)}
+          aria-label="Next page"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
