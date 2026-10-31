@@ -18,7 +18,9 @@ function loadAppearance() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as { darkMode: boolean; compactTables: boolean; landingPage: string };
-  } catch {}
+  } catch {
+    /* ignore malformed storage */
+  }
   return { darkMode: document.documentElement.classList.contains("dark"), compactTables: false, landingPage: "dashboard" };
 }
 

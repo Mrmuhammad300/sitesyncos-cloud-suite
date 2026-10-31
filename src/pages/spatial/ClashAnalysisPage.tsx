@@ -134,7 +134,8 @@ export default function ClashAnalysisPage() {
   const toggleClashSelect = (id: string) => {
     setSelectedClashes((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };

@@ -25,22 +25,20 @@ export default defineConfig(({ mode }) => ({
     pure: mode === "production" ? ["console.log"] : [],
   },
   build: {
+    target: "es2020",
     sourcemap: mode !== "production",
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-charts": ["recharts"],
-          "vendor-radix": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-popover",
-          ],
-          "vendor-three": ["three", "@react-three/fiber", "@react-three/drei"],
+        // Only split long-lived framework code. Heavy libraries (three, recharts)
+        // stay in the lazy route chunks that actually use them.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[/\\]node_modules[/\\](react|react-dom|react-router|react-router-dom|scheduler)[/\\]/.test(id)) return "vendor-react";
+          if (id.includes("@radix-ui")) return "vendor-radix";
+          if (id.includes("@supabase")) return "vendor-supabase";
+          if (id.includes("@tanstack")) return "vendor-query";
+          return undefined;
         },
       },
     },
