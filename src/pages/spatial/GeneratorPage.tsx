@@ -1,7 +1,6 @@
-import { Suspense, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Edges, OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import * as THREE from "three";
+import { Suspense, useDeferredValue, useMemo, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Download, FolderOpen, History, Layers, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,51 +12,49 @@ import { useBlenderJobs, useCreateBlenderJob, useBlenderJobStatus, type BlenderJ
 import { useScenePalette, type ScenePalette } from "@/components/spatial/sceneTheme";
 import { AxisGizmo, CameraProbe, Readout, SceneFallback, SceneGrid, SceneLights, Viewport, ViewportSlot } from "@/components/spatial/Viewport";
 import { JobProgress } from "@/components/spatial/JobProgress";
+import { ProceduralBuilding, buildingFraming } from "@/components/spatial/ProceduralBuilding";
+import { ModelFile, isRenderableModel } from "@/components/spatial/ModelFile";
+import { buildingHeight, grossFloorArea, specFromPrompt, type BuildingSpec } from "@/lib/spatial/buildingSpec";
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
-  "Modern open-plan office, 5,000 sqft, 30 desks, 3 meeting rooms, kitchen",
-  "Residential floor layout, 2,400 sqft, 3 bedrooms, 2 bathrooms, open kitchen",
-  "Retail showroom, 8,000 sqft, high ceilings, reception area, storage rooms",
-  "Mixed-use lobby, 1,200 sqft, elevator core, mailroom, bike storage",
-  "Medical clinic, 3,200 sqft, 6 exam rooms, waiting area, nurses station",
+  "12-storey mass timber office with retail podium and green roof",
+  "24-storey residential tower with balconies on a 2-storey podium",
+  "Two-level retail showroom, 8,000 sqft, high ceilings, glass facade",
+  "Mixed-use tower, 30 floors, retail base, hotel above",
+  "4-storey medical clinic around a courtyard, brick facade",
+  "Single storey steel distribution warehouse, 12,000 m2",
 ];
 
-const SHORT = ["Open-plan office", "3-bed residence", "Retail showroom", "Mixed-use lobby", "Medical clinic"];
+const SHORT = ["Timber office", "Residential tower", "Retail showroom", "Mixed-use tower", "Courtyard clinic", "Warehouse"];
 
-/** Massing study that "assembles" while a job is running and settles when ready. */
-function PlaceholderScene({ palette, status }: { palette: ScenePalette; status: BlenderJobStatus | null }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const live = status === "pending" || status === "processing";
-  useFrame(({ clock }) => {
-    if (groupRef.current) groupRef.current.rotation.y = clock.getElapsedTime() * (live ? 0.6 : 0.15);
-  });
+/**
+ * Live preview of the parsed prompt. Before generation it shows an x-ray
+ * massing; while a job runs the building rises floor by floor; when the job
+ * returns a GLB/glTF file, that file is shown instead.
+ */
+function GeneratedScene({ palette, spec, status, fileUrl }: { palette: ScenePalette; spec: BuildingSpec; status: BlenderJobStatus | null; fileUrl?: string | null }) {
+  const framing = useMemo(() => buildingFraming(spec), [spec]);
+  const progress = status === "pending" ? 0.06 : status === "processing" ? 0.9 : 1;
   const ready = status === "completed";
-  const blocks: [number, number, number, number, number, number][] = [
-    [0, 1.5, 0, 4, 3, 3],
-    [-1, 3.75, 0.25, 2, 1.5, 2.5],
-    [1.25, 3.4, -0.5, 1.5, 0.8, 2],
-  ];
+  const preview = !status;
+  const dir = [1, 0.72, 1];
+  const n = Math.hypot(dir[0], dir[1], dir[2]);
+  const pos = dir.map((v, i) => (v / n) * framing.distance + framing.target[i]) as [number, number, number];
+  const building = (
+    <ProceduralBuilding spec={spec} palette={palette} mode={preview ? "xray" : "shaded"} progress={progress} sway={!ready || preview} />
+  );
   return (
     <>
-      <PerspectiveCamera makeDefault position={[9, 7, 9]} fov={42} />
-      <OrbitControls makeDefault enableDamping dampingFactor={0.1} target={[0, 2, 0]} />
-      <SceneLights palette={palette} />
-      <SceneGrid palette={palette} size={28} />
-      <group ref={groupRef}>
-        {blocks.map(([x, y, z, w, h, d], i) => (
-          <mesh key={i} position={[x, y, z]} castShadow>
-            <boxGeometry args={[w, h, d]} />
-            <meshStandardMaterial
-              color={ready ? (i === 0 ? palette.slab : palette.spatial) : palette.spatial}
-              transparent
-              opacity={ready ? 0.9 : 0.08}
-              roughness={0.6}
-            />
-            <Edges color={ready ? palette.foreground : live ? palette.primary : palette.spatial} threshold={15} />
-          </mesh>
-        ))}
-      </group>
+      <PerspectiveCamera makeDefault position={pos} fov={42} near={0.1} far={framing.distance * 12} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.05} target={framing.target} autoRotate={!ready} autoRotateSpeed={0.6} />
+      <SceneLights palette={palette} extent={Math.max(framing.radius, framing.height)} />
+      <SceneGrid palette={palette} size={Math.max(40, framing.radius * 5)} />
+      {ready && isRenderableModel(fileUrl) ? (
+        <ModelFile url={fileUrl} fit={Math.max(framing.height, framing.radius * 1.6)} fallback={building} />
+      ) : (
+        building
+      )}
       <AxisGizmo palette={palette} />
     </>
   );
@@ -90,6 +87,9 @@ export default function GeneratorPage() {
   const createJob = useCreateBlenderJob();
   const status = activeJob?.status ?? null;
   const ready = status === "completed";
+  const deferredPrompt = useDeferredValue(prompt);
+  // The active job's prompt wins once submitted, so editing the box doesn't morph the result.
+  const spec = useMemo(() => specFromPrompt(activeJob?.prompt ?? deferredPrompt), [activeJob?.prompt, deferredPrompt]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -189,7 +189,7 @@ export default function GeneratorPage() {
                 <ViewportSlot at="top-left">
                   <Readout className="text-foreground">
                     <span className={cn("h-1.5 w-1.5 rounded-full", ready ? "bg-success" : status ? "animate-pulse bg-primary" : "bg-muted-foreground/50")} />
-                    {ready ? "Generated model" : status ? "Assembling massing" : "Preview · awaiting prompt"}
+                    {ready ? spec.name : status ? `Building ${spec.name}…` : prompt.trim() ? `Live preview · ${spec.name}` : "Preview · awaiting prompt"}
                   </Readout>
                 </ViewportSlot>
                 <ViewportSlot at="bottom-left">
@@ -199,12 +199,12 @@ export default function GeneratorPage() {
                   <div className="absolute inset-x-3 top-12 z-10 sm:left-auto sm:right-3 sm:top-3 sm:w-[340px]">
                     <ActiveJobMonitor jobId={activeJobId} />
                   </div>
-                ) : (
+                ) : prompt.trim() ? null : (
                   <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                     <div className="max-w-[260px] rounded-xl border border-border/80 bg-background/70 px-4 py-3 text-center backdrop-blur-md">
                       <Sparkles className="mx-auto mb-1.5 h-4 w-4 text-mod-spatial" />
-                      <p className="text-[13px] font-medium">Your model will appear here</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Write a prompt, then generate.</p>
+                      <p className="text-[13px] font-medium">Describe a building</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">It previews live as you type — storeys, use, structure and facade are all understood.</p>
                     </div>
                   </div>
                 )}
@@ -213,11 +213,27 @@ export default function GeneratorPage() {
           >
             <Canvas shadows dpr={[1, 2]} aria-label="Generated model preview">
               <Suspense fallback={<SceneFallback />}>
-                <PlaceholderScene palette={palette} status={status} />
+                <GeneratedScene palette={palette} spec={spec} status={status} fileUrl={activeJob?.result_url} />
                 <CameraProbe target={probe} />
               </Suspense>
             </Canvas>
           </Viewport>
+
+          <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-6">
+            {[
+              ["Use", spec.use],
+              ["Storeys", `${spec.floors + spec.podiumFloors}${spec.podiumFloors ? ` · ${spec.podiumFloors} podium` : ""}`],
+              ["Height", `${buildingHeight(spec).toFixed(1)} m`],
+              ["GFA", `${grossFloorArea(spec).toLocaleString()} m²`],
+              ["Structure", spec.structure],
+              ["Facade", spec.facade === "curtain" ? "curtain wall" : spec.facade === "fins" ? "fins" : spec.facade === "punched" ? "punched" : "ribbon"],
+            ].map(([k, v]) => (
+              <div key={k} className="bg-surface-1 px-3 py-2.5">
+                <dt className="ss-eyebrow text-[9.5px]">{k}</dt>
+                <dd className="ss-num mt-1 truncate text-[13px] capitalize">{v}</dd>
+              </div>
+            ))}
+          </dl>
 
           <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
             {[
