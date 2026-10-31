@@ -62,7 +62,8 @@ storage and edge-function APIs over a seeded construction portfolio (`src/lib/de
 - Creates, edits and deletes persist in that visitor's `localStorage`. "Reset demo data" in the
   account menu restores the original dataset.
 - A **Demo workspace** badge in the header makes the mode obvious.
-- Realtime and the external Blender generation service are not available in demo mode.
+- Live feeds replay sample realtime events, and 3D generation / floor-plan jobs are simulated
+  in the browser, so every page works without external services.
 
 ## Project layout
 

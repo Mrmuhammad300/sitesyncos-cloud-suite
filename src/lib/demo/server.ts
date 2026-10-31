@@ -8,7 +8,7 @@
  * a seeded dataset persisted to localStorage — so every screen works, and
  * creates/edits/deletes stick for the visitor's browser.
  */
-import { FIXTURES, PROFILE, USER_ID } from "./fixtures";
+import { FIXTURES, PROFILE, USER_ID, demoLayout } from "./fixtures";
 
 type Row = Record<string, any>;
 type DB = Record<string, Row[]>;
@@ -52,6 +52,11 @@ function save() {
   } catch {
     /* quota or private mode — keep in memory */
   }
+}
+
+/** Current rows of a demo table (used by the realtime stub). */
+export function demoRows(table: string): Row[] {
+  return load()[table] ?? [];
 }
 
 /** Wipe local edits and restore the original demo dataset. */
@@ -281,6 +286,7 @@ async function handleRest(table: string, method: string, url: URL, headers: Head
       else rows.unshift(r);
     }
     save();
+    if (table === "blender_jobs") incoming.forEach((j) => runDemoJob(j.id));
     if (!returnRep) return new Response(null, { status: 201 });
     const out = project(incoming, params.get("select"));
     return single ? json(out[0] ?? null, 201) : json(out, 201);
@@ -305,6 +311,45 @@ async function handleRest(table: string, method: string, url: URL, headers: Head
   }
 
   return json({ message: "Method not supported in demo mode" }, 405);
+}
+
+// ─── Simulated Blender worker ────────────────────────────────────────────────
+function runDemoJob(jobId: string) {
+  const update = (patch: Row) => {
+    const store = load();
+    const job = store.blender_jobs?.find((j) => j.id === jobId);
+    if (!job) return null;
+    Object.assign(job, patch, { updated_at: new Date().toISOString() });
+    save();
+    return job;
+  };
+  setTimeout(() => update({ status: "processing" }), 1500);
+  setTimeout(() => {
+    const job = update({
+      status: "completed",
+      result_metadata: { demo: true, elements: 1200 + Math.floor(Math.random() * 3000), duration_ms: 4800 },
+    });
+    if (!job) return;
+    const store = load();
+    if (job.job_type === "floor-plan") {
+      const variants = (store.floor_plan_variants ??= []);
+      const start = variants.length;
+      for (let i = 0; i < 3; i++) {
+        variants.unshift({
+          ...withDefaults("floor_plan_variants", {}),
+          project_id: job.project_id, blender_job_id: job.id, variant_number: start + i + 1,
+          variant_name: `Option ${String.fromCharCode(65 + ((start + i) % 26))}`, status: "draft",
+          approved_by: null, approved_at: null, notes: job.prompt, ...demoLayout(start + i, 1 + (i % 2) * 0.2),
+        });
+      }
+    } else {
+      (store.generated_models ??= []).unshift({
+        ...withDefaults("generated_models", {}), blender_job_id: job.id, model_name: (job.prompt || "Generated model").slice(0, 60),
+        file_format: "glb", file_url: "", thumbnail_url: null, layers: null, bounds: { width: 24, height: 36, depth: 18 }, element_count: 2400,
+      });
+    }
+    save();
+  }, 6500);
 }
 
 // ─── Edge functions ──────────────────────────────────────────────────────────

@@ -191,6 +191,36 @@ const AUDIT = [
 
 export const PROFILE: Record<string, any> = { id: id("pf", 1), user_id: USER_ID, display_name: "Jordan Reyes", role: "admin", avatar_url: null, created_at: iso(-300), updated_at: iso(-1) };
 
+const ROOM_SETS = [
+  [["Living", "living", 0, 0, 7, 5], ["Kitchen", "kitchen", 7, 0, 4, 5], ["Bedroom 1", "bedroom", 0, 5, 5, 4], ["Bath", "bath", 5, 5, 2, 4], ["Bedroom 2", "bedroom", 7, 5, 4, 4]],
+  [["Open Office", "office", 0, 0, 8, 6], ["Meeting", "meeting", 8, 0, 3, 3], ["Phone", "office", 8, 3, 3, 3], ["Lobby", "lobby", 0, 6, 5, 3], ["Core", "core", 5, 6, 6, 3]],
+  [["Retail A", "retail", 0, 0, 5, 6], ["Retail B", "retail", 5, 0, 6, 6], ["Back of House", "service", 0, 6, 7, 3], ["Restrooms", "bath", 7, 6, 4, 3]],
+] as const;
+
+/** Build a floor-plan layout in the shape FloorPlanVariant.layout_json expects. */
+export function demoLayout(set: number, scale = 1) {
+  const rooms = ROOM_SETS[set % ROOM_SETS.length].map(([name, type, x, y, w, h]) => ({
+    name, type, x: x * scale, y: y * scale, width: w * scale, height: h * scale, area: Math.round(w * h * scale * scale * 10.76),
+  }));
+  const W = Math.max(...rooms.map((r) => r.x + r.width));
+  const H = Math.max(...rooms.map((r) => r.y + r.height));
+  const walls = rooms.flatMap((r) => [
+    { x1: r.x, y1: r.y, x2: r.x + r.width, y2: r.y }, { x1: r.x + r.width, y1: r.y, x2: r.x + r.width, y2: r.y + r.height },
+    { x1: r.x, y1: r.y + r.height, x2: r.x + r.width, y2: r.y + r.height }, { x1: r.x, y1: r.y, x2: r.x, y2: r.y + r.height },
+  ]);
+  const total = rooms.reduce((s, r) => s + r.area, 0);
+  return {
+    layout_json: { rooms, walls, dimensions: { total_width: W, total_height: H } },
+    metrics: { total_area: total, efficiency_ratio: Math.round((0.78 + (set % 3) * 0.05) * 100) / 100, room_count: rooms.length },
+  };
+}
+
+const VARIANTS = ["Option A — efficient core", "Option B — open plan", "Option C — retail podium"].map((variant_name, i) => ({
+  id: id("fv", i + 1), project_id: PROJECTS[0].id, blender_job_id: null, variant_number: i + 1, variant_name,
+  status: ["approved", "draft", "draft"][i], approved_by: i === 0 ? USER_ID : null, approved_at: i === 0 ? iso(-3) : null,
+  notes: null, created_at: iso(-6 + i), ...demoLayout(i, 1 + (i % 2) * 0.2),
+}));
+
 const TEAM = [
   ["Maya Chen", "project_manager"], ["Daniel Ortiz", "superintendent"], ["Priya Nair", "architect"],
   ["Sam Whitaker", "engineer"], ["Grace Kim", "owner"], ["Marcus Lee", "field_staff"],
@@ -202,7 +232,7 @@ const TEAM = [
 export const FIXTURES: Record<string, Record<string, any>[]> = {
   projects: PROJECTS, rfis: RFIS, properties: PROPERTIES, submittals: SUBMITTALS, change_orders: CHANGE_ORDERS,
   daily_reports: DAILY_REPORTS, budgets: BUDGETS, draw_requests: DRAWS, tenants: TENANTS, work_orders: [...WORK_ORDERS, ...PUNCH],
-  documents: DOCUMENTS, audit_logs: AUDIT, blender_jobs: [], generated_models: [], floor_plan_variants: [], lenders: LENDERS, treasury_transactions: [...TXNS, ...TXN_EXTRA], compliance_items: COMPLIANCE, ai_agents: AGENTS,
+  documents: DOCUMENTS, audit_logs: AUDIT, blender_jobs: [], generated_models: [], floor_plan_variants: VARIANTS, lenders: LENDERS, treasury_transactions: [...TXNS, ...TXN_EXTRA], compliance_items: COMPLIANCE, ai_agents: AGENTS,
   agent_executions: EXECUTIONS, compliance_controls: CONTROLS, agent_control_mappings: MAPPINGS, profiles: [PROFILE, ...TEAM],
   user_roles: [{ id: id("ur", 1), user_id: USER_ID, role: "admin" }, ...TEAM.map((t, i) => ({ id: id("ur", i + 2), user_id: t.user_id, role: t.role }))], agent_decisions: [], agent_learning_signals: [], submittal_files: [],
 };
