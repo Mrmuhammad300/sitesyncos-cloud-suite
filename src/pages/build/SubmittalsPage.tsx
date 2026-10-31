@@ -231,7 +231,7 @@ export default function SubmittalsPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search title or SUB #…" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[160px] sm:flex-none" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-[8.5rem] flex-1 text-xs sm:w-[160px] sm:flex-none" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -239,7 +239,7 @@ export default function SubmittalsPage() {
               </Select>
               {projects.length > 0 && (
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[180px] sm:flex-none" aria-label="Filter by project"><SelectValue placeholder="All projects" /></SelectTrigger>
+                  <SelectTrigger className="h-9 min-w-[8.5rem] flex-1 text-xs sm:w-[180px] sm:flex-none" aria-label="Filter by project"><SelectValue placeholder="All projects" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All projects</SelectItem>
                     {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}

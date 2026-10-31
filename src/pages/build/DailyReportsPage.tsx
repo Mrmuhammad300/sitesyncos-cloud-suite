@@ -344,7 +344,7 @@ export default function DailyReportsPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search report #, author, weather…" />
               <Select value={safetyFilter} onValueChange={setSafetyFilter}>
-                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[150px] sm:flex-none" aria-label="Filter reports"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-[8.5rem] flex-1 text-xs sm:w-[150px] sm:flex-none" aria-label="Filter reports"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SAFETY_FILTERS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>
