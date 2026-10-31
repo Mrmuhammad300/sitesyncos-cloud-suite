@@ -1,6 +1,10 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, ChevronRight, LogOut, Monitor, Moon, Settings, Sun, User } from "lucide-react";
+import { Bell, ChevronRight, FlaskConical, LogOut, Monitor, Moon, RotateCcw, Settings, Sun, User } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { IS_DEMO } from "@/lib/demo";
+import { resetDemoData } from "@/lib/demo/server";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
@@ -76,6 +80,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     document.getElementById("main-scroll")?.scrollTo({ top: 0 });
   }, [pathname]);
 
+  const queryClient = useQueryClient();
+  const handleResetDemo = () => {
+    resetDemoData();
+    queryClient.invalidateQueries();
+    toast.success("Demo data restored.");
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
@@ -101,6 +112,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1">
+            {IS_DEMO && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="mr-1 inline-flex items-center gap-1.5 rounded-full border border-data/30 bg-data/10 px-2.5 py-1 text-[11px] font-medium text-data">
+                    <FlaskConical className="h-3 w-3" />
+                    <span className="hidden sm:inline">Demo workspace</span>
+                    <span className="sm:hidden">Demo</span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[260px]">
+                  Sample data stored in this browser. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to connect a real project.
+                </TooltipContent>
+              </Tooltip>
+            )}
             <div className="mr-2 hidden items-center gap-2 rounded-full border bg-surface-1/60 py-1 pl-2 pr-2.5 xl:flex">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
@@ -161,6 +186,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuRadioItem value="system"><Monitor className="h-4 w-4" /> System</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
+                {IS_DEMO && (
+                  <>
+                    <DropdownMenuItem onClick={handleResetDemo}>
+                      <RotateCcw className="h-4 w-4" /> Reset demo data
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
                   <LogOut className="h-4 w-4" /> Sign out
                 </DropdownMenuItem>

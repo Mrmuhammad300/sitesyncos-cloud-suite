@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { IS_DEMO } from "@/lib/demo";
+
 const BLENDER_API_URL = import.meta.env.VITE_BLENDER_API_URL ?? "http://localhost:3999";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,8 +122,9 @@ export function useCreateBlenderJob() {
         .single();
       if (error) throw error;
 
-      // Fire-and-forget POST to backend API (non-blocking; status polled via useBlenderJobStatus)
-      try {
+      // Fire-and-forget POST to backend API (non-blocking; status polled via useBlenderJobStatus).
+      // In demo mode the in-browser backend simulates the worker instead.
+      if (!IS_DEMO) try {
         const form = new FormData();
         form.append("job_id", (job as BlenderJob).id);
         form.append("job_type", payload.job_type);

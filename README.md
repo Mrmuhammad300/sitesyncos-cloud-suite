@@ -23,8 +23,10 @@ Supabase (Postgres, Auth, Realtime, Edge Functions) · Recharts · Three.js / Re
 ```bash
 nvm use            # Node 20+
 npm ci
+npm run dev            # http://localhost:8080 — runs in demo mode with sample data
+
+# To use a real backend:
 cp .env.example .env   # fill in your Supabase URL + anon key
-npm run dev            # http://localhost:8080
 ```
 
 | Script | Purpose |
@@ -39,8 +41,9 @@ npm run dev            # http://localhost:8080
 The repo ships with a [`vercel.json`](./vercel.json) that sets the Vite framework preset, SPA rewrites,
 long-term caching for hashed assets and security headers.
 
-1. Import the repository in Vercel (framework is detected as **Vite**).
-2. Add environment variables for **Production** and **Preview**:
+1. Import the repository in Vercel (framework is detected as **Vite**) and deploy. That's it —
+   with no environment variables the app runs as a **demo workspace** (see below).
+2. To connect a real backend, add environment variables for **Production** and **Preview**:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_PUBLISHABLE_KEY`
    - `VITE_SUPABASE_PROJECT_ID` (optional)
@@ -49,7 +52,18 @@ long-term caching for hashed assets and security headers.
 4. In Supabase → Authentication → URL Configuration, add your Vercel domain(s) to **Site URL** and
    **Redirect URLs** so sign-up and password-reset links work.
 
-If the Supabase variables are missing, the app shows a setup screen instead of a blank page.
+### Demo mode
+
+When `VITE_SUPABASE_URL` or `VITE_SUPABASE_PUBLISHABLE_KEY` is missing (or `VITE_DEMO_MODE=true`),
+SiteSync runs entirely in the browser: `src/lib/demo/server.ts` emulates the Supabase REST, auth,
+storage and edge-function APIs over a seeded construction portfolio (`src/lib/demo/fixtures.ts`).
+
+- Visitors land signed in; any email/password works on the login page.
+- Creates, edits and deletes persist in that visitor's `localStorage`. "Reset demo data" in the
+  account menu restores the original dataset.
+- A **Demo workspace** badge in the header makes the mode obvious.
+- Live feeds replay sample realtime events, and 3D generation / floor-plan jobs are simulated
+  in the browser, so every page works without external services.
 
 ## Project layout
 

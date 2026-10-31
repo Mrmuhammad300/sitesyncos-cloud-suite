@@ -1,10 +1,13 @@
-// Deterministic demo data for visual QA. Shapes match src/integrations/supabase/types.ts.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Demo dataset used when SiteSync runs without a Supabase project (and by the visual QA harness).
+// Shapes match src/integrations/supabase/types.ts. Dates are relative to "now" so the demo never goes stale.
 const DAY = 86_400_000;
 const now = Date.now();
-const iso = (offsetDays) => new Date(now + offsetDays * DAY).toISOString();
-const date = (offsetDays) => iso(offsetDays).slice(0, 10);
-const id = (p, i) => `${p}-0000-4000-8000-${String(i).padStart(12, "0")}`;
-const base = (p, i) => ({ id: id(p, i), created_at: iso(-200 + i * 9), updated_at: iso(-i) });
+const iso = (offsetDays: any) => new Date(now + Number(offsetDays) * DAY).toISOString();
+const date = (offsetDays: any) => iso(offsetDays).slice(0, 10);
+export const id = (p: string, i: number) => `${p}-0000-4000-8000-${String(i).padStart(12, "0")}`;
+export const USER_ID = "u0000000-0000-4000-8000-000000000001";
+const base = (p: string, i: number) => ({ id: id(p, i), created_at: iso(-200 + i * 9), updated_at: iso(-i) });
 
 const PROJECTS = [
   ["Harbor Point Tower", "Seattle, WA", "Maya Chen", "On Track", 48_000_000, 31_200_000, 64, -330, 220, "Superstructure", 84],
@@ -86,7 +89,7 @@ const TENANTS = [
   ["Orbit Analytics", "Granary Row Offices", "Suite 220", 18_900, "Pending"],
 ].map(([tenant_name, property_name, unit, monthly_rent, status], i) => ({
   ...base("t", i + 1), tenant_name, property_name, unit, monthly_rent, status, lease_start: date(-700 + i * 40), lease_end: date(60 + i * 120),
-  contact_email: `ops@${tenant_name.toLowerCase().replace(/[^a-z]/g, "")}.com`, contact_phone: "(555) 010-12" + i, notes: null,
+  contact_email: `ops@${String(tenant_name).toLowerCase().replace(/[^a-z]/g, "")}.com`, contact_phone: "(555) 010-12" + i, notes: null,
 }));
 
 const WORK_ORDERS = ["HVAC not cooling — unit 1402", "Lobby door closer failure", "Leak at parking level P2", "Replace corridor LED fixtures", "Elevator 3 inspection", "Irrigation controller fault"].map((title, i) => ({
@@ -152,13 +155,84 @@ const MAPPINGS = CONTROLS.flatMap((c, i) => AGENTS.slice(0, 3).map((a, j) => ({
   is_required: true, evidence: null, notes: null, owner: "Grace Kim", last_reviewed: date(-i * 7),
 })));
 
-export const USER_ID = "u0000000-0000-4000-8000-000000000001";
-export const PROFILE = { id: id("pf", 1), user_id: USER_ID, display_name: "Jordan Reyes", role: "admin", avatar_url: null, created_at: iso(-300), updated_at: iso(-1) };
+const PUNCH = [
+  ["Touch-up paint at L4 corridor", "Finishes", "Completed"], ["Missing cover plate, room 312", "Electrical", "Open"],
+  ["Adjust door closer, stair B", "Doors", "In Progress"], ["Caulk gap at storefront mullion", "Glazing", "Open"],
+  ["Replace cracked tile, lobby restroom", "Finishes", "Completed"], ["Label breaker panel 2A", "Electrical", "Completed"],
+  ["Ceiling tile stain, suite 220", "Finishes", "Open"], ["Sprinkler escutcheon missing, L6", "Fire Protection", "Completed"],
+].map(([title, trade, status], i) => ({
+  ...base("pl", i + 1), wo_number: `PL-${String(301 + i)}`, title, category: "Punch List", priority: ["Low", "Medium", "Medium", "High"][i % 4],
+  status, property_name: PROJECTS[i % 3].name, unit: `L${(i % 6) + 1}`, assigned_to: ({ Finishes: "Pro Finish Co.", Electrical: "Volt Electric", Doors: "Metro Doors", Glazing: "Clearview Glazing", "Fire Protection": "Guardian Fire" } as Record<string, string>)[trade as string],
+  reported_by: "Owner walk", due_date: date(-3 + i * 2), completed_date: status === "Completed" ? date(-1 - i) : null, description: trade,
+}));
 
-export const FIXTURES = {
+const TXN_EXTRA = [
+  ["Milestone", "Topping-out milestone release", 2_400_000, "Released"], ["Milestone", "Envelope dry-in milestone", 1_850_000, "Pending"],
+  ["Milestone", "Substantial completion — retainage", 3_100_000, "Scheduled"], ["Approval", "Change order CO-032 funding", 412_500, "Pending"],
+  ["Approval", "Curtain wall deposit — Clearview", 286_000, "Pending"],
+].map(([txn_type, description, amt, status], i) => ({
+  ...base("txm", i + 1), txn_number: `TXN-${String(5100 + i)}`, txn_date: date(-10 + i * 12), txn_type, description, account: "Construction",
+  debit: txn_type === "Approval" ? amt : null, credit: txn_type === "Milestone" ? amt : null, status, project_name: PROJECTS[i % 3].name, requestor: "Maya Chen",
+}));
+
+const AUDIT = [
+  ["UPDATE", "projects", PROJECTS[1].id, { status: "On Track", progress: 68 }, { status: "At Risk", progress: 71 }],
+  ["INSERT", "rfis", RFIS[0].id, null, { rfi_number: "RFI-140", subject: RFIS[0].subject, priority: "High" }],
+  ["UPDATE", "change_orders", CHANGE_ORDERS[1].id, { status: "Draft" }, { status: "Pending" }],
+  ["UPDATE", "draw_requests", DRAWS[2].id, { status: "Submitted" }, { status: "Approved", approved_by: "First Meridian Bank" }],
+  ["DELETE", "documents", "d-legacy-0042", { title: "Superseded spec Vol. 1" }, null],
+  ["INSERT", "daily_reports", DAILY_REPORTS[0].id, null, { report_number: "DR-400", crew_count: 42 }],
+  ["UPDATE", "tenants", TENANTS[4].id, { status: "Active" }, { status: "Expiring" }],
+  ["UPDATE", "budgets", BUDGETS[2].id, { spent: 7_600_000 }, { spent: 8_100_000 }],
+].map(([action, table_name, record_id, old_values, new_values], i) => ({
+  id: id("al", i + 1), user_id: USER_ID, action, table_name, record_id, old_values, new_values,
+  ip_address: "10.0.4.12", user_agent: "SiteSync OS", created_at: iso(-i * 0.4),
+}));
+
+export const PROFILE: Record<string, any> = { id: id("pf", 1), user_id: USER_ID, display_name: "Jordan Reyes", role: "admin", avatar_url: null, created_at: iso(-300), updated_at: iso(-1) };
+
+const ROOM_SETS = [
+  [["Living", "living", 0, 0, 7, 5], ["Kitchen", "kitchen", 7, 0, 4, 5], ["Bedroom 1", "bedroom", 0, 5, 5, 4], ["Bath", "bath", 5, 5, 2, 4], ["Bedroom 2", "bedroom", 7, 5, 4, 4]],
+  [["Open Office", "office", 0, 0, 8, 6], ["Meeting", "meeting", 8, 0, 3, 3], ["Phone", "office", 8, 3, 3, 3], ["Lobby", "lobby", 0, 6, 5, 3], ["Core", "core", 5, 6, 6, 3]],
+  [["Retail A", "retail", 0, 0, 5, 6], ["Retail B", "retail", 5, 0, 6, 6], ["Back of House", "service", 0, 6, 7, 3], ["Restrooms", "bath", 7, 6, 4, 3]],
+] as const;
+
+/** Build a floor-plan layout in the shape FloorPlanVariant.layout_json expects. */
+export function demoLayout(set: number, scale = 1) {
+  const rooms = ROOM_SETS[set % ROOM_SETS.length].map(([name, type, x, y, w, h]) => ({
+    name, type, x: x * scale, y: y * scale, width: w * scale, height: h * scale, area: Math.round(w * h * scale * scale * 10.76),
+  }));
+  const W = Math.max(...rooms.map((r) => r.x + r.width));
+  const H = Math.max(...rooms.map((r) => r.y + r.height));
+  const walls = rooms.flatMap((r) => [
+    { x1: r.x, y1: r.y, x2: r.x + r.width, y2: r.y }, { x1: r.x + r.width, y1: r.y, x2: r.x + r.width, y2: r.y + r.height },
+    { x1: r.x, y1: r.y + r.height, x2: r.x + r.width, y2: r.y + r.height }, { x1: r.x, y1: r.y, x2: r.x, y2: r.y + r.height },
+  ]);
+  const total = rooms.reduce((s, r) => s + r.area, 0);
+  return {
+    layout_json: { rooms, walls, dimensions: { total_width: W, total_height: H } },
+    metrics: { total_area: total, efficiency_ratio: Math.round((0.78 + (set % 3) * 0.05) * 100) / 100, room_count: rooms.length },
+  };
+}
+
+const VARIANTS = ["Option A — efficient core", "Option B — open plan", "Option C — retail podium"].map((variant_name, i) => ({
+  id: id("fv", i + 1), project_id: PROJECTS[0].id, blender_job_id: null, variant_number: i + 1, variant_name,
+  status: ["approved", "draft", "draft"][i], approved_by: i === 0 ? USER_ID : null, approved_at: i === 0 ? iso(-3) : null,
+  notes: null, created_at: iso(-6 + i), ...demoLayout(i, 1 + (i % 2) * 0.2),
+}));
+
+const TEAM = [
+  ["Maya Chen", "project_manager"], ["Daniel Ortiz", "superintendent"], ["Priya Nair", "architect"],
+  ["Sam Whitaker", "engineer"], ["Grace Kim", "owner"], ["Marcus Lee", "field_staff"],
+].map(([display_name, role], i) => ({
+  id: id("pf", i + 2), user_id: `u0000000-0000-4000-8000-${String(i + 2).padStart(12, "0")}`, display_name, role, avatar_url: null,
+  created_at: iso(-280 + i * 30), updated_at: iso(-i),
+}));
+
+export const FIXTURES: Record<string, Record<string, any>[]> = {
   projects: PROJECTS, rfis: RFIS, properties: PROPERTIES, submittals: SUBMITTALS, change_orders: CHANGE_ORDERS,
-  daily_reports: DAILY_REPORTS, budgets: BUDGETS, draw_requests: DRAWS, tenants: TENANTS, work_orders: WORK_ORDERS,
-  documents: DOCUMENTS, lenders: LENDERS, treasury_transactions: TXNS, compliance_items: COMPLIANCE, ai_agents: AGENTS,
-  agent_executions: EXECUTIONS, compliance_controls: CONTROLS, agent_control_mappings: MAPPINGS, profiles: [PROFILE],
-  user_roles: [{ id: id("ur", 1), user_id: USER_ID, role: "admin" }], agent_decisions: [], agent_learning_signals: [], submittal_files: [],
+  daily_reports: DAILY_REPORTS, budgets: BUDGETS, draw_requests: DRAWS, tenants: TENANTS, work_orders: [...WORK_ORDERS, ...PUNCH],
+  documents: DOCUMENTS, audit_logs: AUDIT, blender_jobs: [], generated_models: [], floor_plan_variants: VARIANTS, lenders: LENDERS, treasury_transactions: [...TXNS, ...TXN_EXTRA], compliance_items: COMPLIANCE, ai_agents: AGENTS,
+  agent_executions: EXECUTIONS, compliance_controls: CONTROLS, agent_control_mappings: MAPPINGS, profiles: [PROFILE, ...TEAM],
+  user_roles: [{ id: id("ur", 1), user_id: USER_ID, role: "admin" }, ...TEAM.map((t, i) => ({ id: id("ur", i + 2), user_id: t.user_id, role: t.role }))], agent_decisions: [], agent_learning_signals: [], submittal_files: [],
 };
