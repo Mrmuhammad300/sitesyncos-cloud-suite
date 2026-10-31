@@ -31,11 +31,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # No Supabase secrets needed: without them the build runs in demo mode.
       - name: Build
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: https://placeholder.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: placeholder
 
 # Deployment is handled by the Vercel GitHub integration (see vercel.json):
 # every PR gets a preview URL and merges to main deploy to production.

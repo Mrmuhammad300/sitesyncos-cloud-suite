@@ -72,5 +72,5 @@ Charts: import from `@/lib/chart` — `CHART`, `SERIES`, `STATUS_CHART_COLOR`, `
 ## Visual QA
 
 `node scripts/qa/shoot.mjs --routes /build/projects --themes dark,light --widths 1440,390 --out qa-shots`
-boots the app with mocked Supabase data (`scripts/qa/fixtures.mjs`) and screenshots each route.
+boots the app in demo mode (sample data from `src/lib/demo/fixtures.ts`) and screenshots each route.
 Add `--empty` to review empty states.

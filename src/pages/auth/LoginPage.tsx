@@ -9,6 +9,7 @@ import { BrandMark } from "@/components/os/BrandMark";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { IS_DEMO } from "@/lib/demo";
 
 const friendly = (msg: string) => {
   const m = msg.toLowerCase();
@@ -234,6 +235,22 @@ export default function LoginPage() {
             ))}
           </div>
 
+          {IS_DEMO && (
+            <div className="mt-6 flex items-start gap-3 rounded-lg border border-data/30 bg-data/[0.07] p-3 text-[13px]">
+              <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-data" />
+              <div className="space-y-2">
+                <p><span className="font-medium text-foreground">Demo workspace.</span> <span className="text-muted-foreground">Any email and password works — data stays in your browser.</span></p>
+                <button
+                  type="button"
+                  onClick={() => { setEmail("demo@sitesync.dev"); setPassword("demo-password"); }}
+                  className="font-medium text-data hover:underline"
+                >
+                  Fill in demo credentials →
+                </button>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {!isLogin && (
               <div className="space-y-1.5 animate-fade-in">
@@ -292,7 +309,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Protected by row-level security · SOC 2-ready audit trail
+            {IS_DEMO ? "Running on sample data · connect Supabase for live projects" : "Protected by row-level security · SOC 2-ready audit trail"}
           </p>
         </div>
 
