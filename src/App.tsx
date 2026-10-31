@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,6 +26,12 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Reset the error boundary whenever the route changes, so one broken page doesn't strand the user. */
+function RouteErrorBoundary({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -41,9 +47,9 @@ const App = () => (
               <Route path="*" element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <ErrorBoundary>
+                    <RouteErrorBoundary>
                       <AnimatedRoutes />
-                    </ErrorBoundary>
+                    </RouteErrorBoundary>
                   </AppLayout>
                 </ProtectedRoute>
               } />
