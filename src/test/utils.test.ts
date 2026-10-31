@@ -11,7 +11,7 @@ describe("cn (class merging utility)", () => {
   });
 
   it("omits falsy values", () => {
-    expect(cn("foo", false && "bar", undefined, null, "baz")).toBe("foo baz");
+    expect(cn("foo", false, undefined, null, "baz")).toBe("foo baz");
   });
 
   it("merges conflicting Tailwind classes, keeping the last", () => {

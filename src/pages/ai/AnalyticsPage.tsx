@@ -1,205 +1,418 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown, Activity, Target } from "lucide-react";
-import { useProjects } from "@/hooks/useProjectData";
-import { useRFIs } from "@/hooks/useProjectData";
-import { useChangeOrders } from "@/hooks/useProjectData";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import {
+  Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart,
+  Tooltip, XAxis, YAxis, ZAxis,
+} from "recharts";
+import { Activity, BarChart3, CircleDollarSign, FileQuestion, FileText, HardHat, Sparkles, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState, PageHeader, Panel, StatCard } from "@/components/os";
+import { ChartLegend, Shimmer } from "@/components/ai/primitives";
+import { prefersReducedMotion } from "@/components/ai/agent-meta";
+import { useChangeOrders, useProjects, useRFIs } from "@/hooks/useProjectData";
 import { useBudgets } from "@/hooks/useOpsData";
+import { CHART, STATUS_CHART_COLOR, axisProps, gridProps, tooltipProps } from "@/lib/chart";
+import { PROJECT_STATUSES, budgetBurn } from "@/lib/dashboard";
+import { cn, fmtDollar } from "@/lib/utils";
 
-const chartConfig = {
-  budget: { label: "Budget ($K)", color: "hsl(var(--muted-foreground))" },
-  actual: { label: "Spent ($K)", color: "hsl(var(--primary))" },
-  value: { label: "Value", color: "hsl(var(--primary))" },
+const CO_TONE: Record<string, string> = {
+  approved: CHART.success,
+  pending: CHART.warning,
+  "under review": CHART.info,
+  "in review": CHART.info,
+  rejected: CHART.destructive,
 };
+const CO_ORDER = ["Pending", "Under Review", "In Review", "Approved", "Rejected"];
 
-const STATUS_COLORS: Record<string, string> = {
-  "On Track": "hsl(var(--success))",
-  "At Risk": "hsl(var(--warning))",
-  "Behind": "hsl(var(--destructive))",
-  "Complete": "hsl(var(--primary))",
-};
+const RFI_STATUSES = [
+  { key: "Open", color: CHART.warning },
+  { key: "Pending", color: CHART.info },
+  { key: "In Review", color: CHART.data },
+  { key: "Answered", color: CHART.success },
+  { key: "Closed", color: CHART.muted },
+] as const;
+const PRIORITIES = ["High", "Medium", "Low"] as const;
+
+const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+const money = (v: number) => fmtDollar(v);
+
+/** Single-line, truncated category label for horizontal bar charts. */
+function NameTick({ x, y, payload, max = 16 }: { x?: number; y?: number; payload?: { value: string }; max?: number }) {
+  const v = payload?.value ?? "";
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fontSize={12} className="fill-foreground">
+      <title>{v}</title>
+      {short(v, max)}
+    </text>
+  );
+}
 
 export default function AnalyticsPage() {
-  const { data: projects = [] } = useProjects();
-  const { data: rfis = [] } = useRFIs();
-  const { data: changeOrders = [] } = useChangeOrders();
-  const { data: budgets = [] } = useBudgets();
+  const { data: projects = [], isLoading: pLoading } = useProjects();
+  const { data: rfis = [], isLoading: rLoading } = useRFIs();
+  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders();
+  const { data: budgets = [], isLoading: bLoading } = useBudgets();
 
-  // KPI calculations
-  const totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
-  const totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
-  const budgetEfficiency = totalBudget > 0 ? ((1 - (totalSpent / totalBudget)) * 100 + 90).toFixed(1) : "—";
-  const openRFIs = rfis.filter(r => r.status === "Open" || r.status === "In Review").length;
-  const criticalRFIs = rfis.filter(r => r.priority === "High" && r.status !== "Closed").length;
-  const avgProgress = projects.length
-    ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length)
-    : 0;
-  const onTrackCount = projects.filter(p => p.status === "On Track" || p.status === "Complete").length;
-  const onTimeRate = projects.length ? Math.round((onTrackCount / projects.length) * 100) : 0;
+  const m = useMemo(() => {
+    // KPI calculations
+    const totalBudget = projects.reduce((s, p) => s + Number(p.budget), 0);
+    const totalSpent = projects.reduce((s, p) => s + Number(p.spent), 0);
+    const consumed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : null;
+    const openRFIs = rfis.filter((r) => r.status === "Open" || r.status === "In Review").length;
+    const criticalRFIs = rfis.filter((r) => r.priority === "High" && r.status !== "Closed").length;
+    const avgProgress = projects.length ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length) : 0;
+    const onTrackCount = projects.filter((p) => p.status === "On Track" || p.status === "Complete").length;
+    const onTimeRate = projects.length ? Math.round((onTrackCount / projects.length) * 100) : 0;
 
-  // Project status breakdown for pie chart
-  const statusCounts = ["On Track", "At Risk", "Behind", "Complete"].map(status => ({
-    name: status,
-    value: projects.filter(p => p.status === status).length,
-    color: STATUS_COLORS[status],
-  })).filter(d => d.value > 0);
+    // Project status breakdown
+    const statusCounts = PROJECT_STATUSES.map((status) => ({
+      name: status,
+      value: projects.filter((p) => p.status === status).length,
+      color: STATUS_CHART_COLOR[status],
+    }));
 
-  // Budget vs Actual per project (top 6)
-  const budgetData = projects.slice(0, 6).map(p => ({
-    name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name,
-    budget: Math.round(Number(p.budget) / 1000),
-    actual: Math.round(Number(p.spent) / 1000),
-  }));
+    // Budget vs actual per project (bullet rows, $M)
+    const budgetData = [...projects]
+      .sort((a, b) => Number(b.budget) - Number(a.budget))
+      .slice(0, 8)
+      .map((p) => ({
+        name: p.name,
+        label: p.name,
+        budget: Number(p.budget),
+        actual: Number(p.spent),
+        burn: budgetBurn(p),
+      }));
 
-  // Change order value by status
-  const coByStatus = ["Pending", "Under Review", "Approved", "Rejected"].map(status => ({
-    name: status,
-    value: Math.round(changeOrders.filter(co => co.status === status).reduce((s, co) => s + Number(co.amount), 0) / 1000),
-  })).filter(d => d.value > 0);
+    // Burn vs progress
+    const burnData = projects.map((p) => ({
+      name: p.name,
+      progress: p.progress,
+      burn: budgetBurn(p),
+      budget: Number(p.budget),
+      status: p.status,
+    }));
+    const ahead = burnData.filter((d) => d.status !== "Complete" && d.burn > d.progress + 5).length;
 
-  // Budget utilization by category (top 6)
-  const budgetCategoryData = budgets.slice(0, 6).map(b => ({
-    name: b.category.length > 14 ? b.category.slice(0, 14) + "…" : b.category,
-    budget: Math.round(Number(b.allocated) / 1000),
-    actual: Math.round(Number(b.spent) / 1000),
-  }));
+    // Change order value by status ($)
+    const rank = (s: string) => (CO_ORDER.includes(s) ? CO_ORDER.indexOf(s) : CO_ORDER.length);
+    const coStatuses = Array.from(new Set(changeOrders.map((co) => co.status))).sort((a, b) => rank(a) - rank(b));
+    const coByStatus = coStatuses
+      .map((status) => {
+        const rows = changeOrders.filter((co) => co.status === status);
+        return {
+          name: status,
+          value: rows.reduce((s, co) => s + Number(co.amount), 0),
+          count: rows.length,
+          color: CO_TONE[status.toLowerCase()] ?? CHART.muted,
+        };
+      })
+      .filter((d) => d.count > 0);
+    // Net exposure excludes rejected change orders.
+    const coNet = coByStatus.filter((d) => d.name.toLowerCase() !== "rejected").reduce((s, d) => s + d.value, 0);
+    const coLive = coByStatus.filter((d) => d.name.toLowerCase() !== "rejected").reduce((s, d) => s + d.count, 0);
+
+    // Budget utilization by category
+    const budgetCategoryData = [...budgets]
+      .sort((a, b) => Number(b.allocated) - Number(a.allocated))
+      .slice(0, 8)
+      .map((b) => ({
+        name: b.category,
+        label: b.category,
+        budget: Number(b.allocated),
+        actual: Number(b.spent),
+        util: Number(b.allocated) > 0 ? Math.round((Number(b.spent) / Number(b.allocated)) * 100) : 0,
+      }));
+
+    // RFI pipeline: priority × status
+    const rfiStack = PRIORITIES.map((priority) => {
+      const row: Record<string, number | string> = { priority };
+      for (const s of RFI_STATUSES) row[s.key] = rfis.filter((r) => r.priority === priority && r.status === s.key).length;
+      return row;
+    });
+    const rfiStatusesPresent = RFI_STATUSES.filter((s) => rfis.some((r) => r.status === s.key));
+
+    return {
+      totalBudget, totalSpent, consumed, openRFIs, criticalRFIs, avgProgress, onTimeRate, statusCounts, budgetData,
+      burnData, ahead, coByStatus, coNet, coLive, budgetCategoryData, rfiStack, rfiStatusesPresent,
+    };
+  }, [projects, rfis, changeOrders, budgets]);
+
+  const bulletH = (n: number) => Math.max(n, 1) * 36 + 28;
+  const anim = !prefersReducedMotion();
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <Badge variant="outline" className="text-[10px]">AI & Intelligence</Badge>
-          <Badge variant="secondary" className="text-[10px]">Live</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground mt-0.5">AI-powered insights and performance analytics</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Analytics"
+        description="Portfolio performance across cost, schedule and coordination — computed live from project data."
+        actions={
+          <>
+            <span className="hidden items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-wider text-success sm:flex">
+              <span className="h-1.5 w-1.5 animate-glow-pulse rounded-full bg-success" />Live
+            </span>
+            <Button variant="outline" asChild>
+              <Link to="/ai-assistant"><Sparkles className="text-mod-ai" />Ask about this</Link>
+            </Button>
+          </>
+        }
+      />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="ss-stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><TrendingUp className="h-3.5 w-3.5" />Budget Efficiency</div>
-            <p className="ss-stat-value">{budgetEfficiency}%</p>
-            <p className="ss-stat-label">{projects.length} projects tracked</p>
-          </CardContent>
-        </Card>
-        <Card className="ss-stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><TrendingDown className="h-3.5 w-3.5" />Open RFIs</div>
-            <p className="ss-stat-value">{openRFIs}</p>
-            <p className={`text-xs ${criticalRFIs > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-              {criticalRFIs > 0 ? `${criticalRFIs} critical` : "None critical"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="ss-stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Activity className="h-3.5 w-3.5" />Avg Progress</div>
-            <p className="ss-stat-value">{avgProgress}%</p>
-            <p className="ss-stat-label">Across all projects</p>
-          </CardContent>
-        </Card>
-        <Card className="ss-stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Target className="h-3.5 w-3.5" />On-Time Rate</div>
-            <p className="ss-stat-value">{onTimeRate}%</p>
-            <p className={`text-xs ${onTimeRate >= 80 ? "text-success" : "text-warning"}`}>
-              {onTimeRate >= 80 ? "Above target" : "Below target"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Budget consumed"
+          value={m.consumed === null ? "—" : `${m.consumed.toFixed(1)}%`}
+          icon={CircleDollarSign}
+          hint={`${money(m.totalSpent)} of ${money(m.totalBudget)}`}
+          tone="data"
+          loading={pLoading}
+        />
+        <StatCard
+          label="Open RFIs"
+          value={m.openRFIs}
+          icon={FileQuestion}
+          hint={m.criticalRFIs > 0 ? `${m.criticalRFIs} high priority` : "None critical"}
+          tone={m.criticalRFIs > 0 ? "warning" : "default"}
+          loading={rLoading}
+        />
+        <StatCard label="Avg progress" value={projects.length ? `${m.avgProgress}%` : "—"} icon={Activity} hint={`${projects.length} projects tracked`} loading={pLoading} />
+        <StatCard
+          label="On-time rate"
+          value={projects.length ? `${m.onTimeRate}%` : "—"}
+          icon={Target}
+          hint={!projects.length ? "80% target" : m.onTimeRate >= 80 ? "Above 80% target" : "Below 80% target"}
+          tone={projects.length ? (m.onTimeRate >= 80 ? "success" : "warning") : "default"}
+          loading={pLoading}
+        />
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Budget vs Actual by Project */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Budget vs Actual by Project ($K)</CardTitle></CardHeader>
-          <CardContent>
-            {budgetData.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">No project data</div>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-[250px]">
-                <BarChart data={budgetData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="name" className="text-xs" tick={{ fontSize: 10 }} />
-                  <YAxis className="text-xs" tick={{ fontSize: 10 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="budget" fill="var(--color-budget)" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="actual" fill="var(--color-actual)" radius={[2, 2, 0, 0]} />
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        {/* Budget vs actual by project */}
+        <Panel
+          className="lg:col-span-8"
+          eyebrow="Cost"
+          title="Budget vs. spent by project"
+          actions={<ChartLegend className="hidden sm:flex" items={[{ label: "Budget", color: CHART.grid }, { label: "Spent", color: CHART.data }]} />}
+        >
+          {pLoading ? <Shimmer className="h-[300px]" /> : m.budgetData.length === 0 ? (
+            <EmptyState compact icon={HardHat} title="No projects yet" description="Budgets and spend will chart here once projects exist." />
+          ) : (
+            <div style={{ height: bulletH(m.budgetData.length) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={m.budgetData} layout="vertical" margin={{ top: 0, right: 44, left: 0, bottom: 0 }} barGap={-12} barCategoryGap={10}>
+                  <CartesianGrid {...gridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...axisProps} tickFormatter={(v) => money(v)} />
+                  <YAxis type="category" dataKey="label" {...axisProps} width={128} tick={<NameTick max={18} />} />
+                  <Tooltip
+                    {...tooltipProps}
+                    labelFormatter={(_l, p) => p?.[0]?.payload?.name ?? ""}
+                    formatter={(v: number, k) => [money(v), k === "budget" ? "Budget" : "Spent"]}
+                  />
+                  <Bar dataKey="budget" fill={CHART.grid} radius={4} barSize={12} isAnimationActive={false} />
+                  <Bar dataKey="actual" fill={CHART.data} radius={4} barSize={12} isAnimationActive={anim}>
+                    <LabelList dataKey="burn" position="right" formatter={(v: number) => `${v}%`} className="fill-muted-foreground font-mono text-[10.5px]" />
+                  </Bar>
                 </BarChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
 
-        {/* Project Status Breakdown */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Project Status Breakdown</CardTitle></CardHeader>
-          <CardContent className="flex items-center justify-center">
-            {statusCounts.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">No project data</div>
-            ) : (
-              <div className="h-[250px] w-full max-w-[400px]">
-                <ResponsiveContainer>
+        {/* Status donut */}
+        <Panel className="lg:col-span-4" eyebrow="Schedule" title="Delivery status">
+          {pLoading ? <Shimmer className="h-[300px]" /> : projects.length === 0 ? (
+            <EmptyState compact icon={BarChart3} title="No status data" description="Project statuses roll up here." />
+          ) : (
+            <div className="flex flex-col gap-5">
+              <div className="relative mx-auto h-[180px] w-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={statusCounts} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
-                      label={({ name, value }) => `${name} (${value})`} labelLine={false}>
-                      {statusCounts.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    <Pie isAnimationActive={anim} data={m.statusCounts.filter((s) => s.value > 0)} dataKey="value" nameKey="name" innerRadius={62} outerRadius={86} paddingAngle={3} stroke="none" startAngle={90} endAngle={-270}>
+                      {m.statusCounts.filter((s) => s.value > 0).map((s) => <Cell key={s.name} fill={s.color} />)}
                     </Pie>
-                    <ChartTooltip />
+                    <Tooltip {...tooltipProps} />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-3xl font-medium tabular-nums">{projects.length}</span>
+                  <span className="ss-eyebrow mt-0.5">Projects</span>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <ul className="grid grid-cols-2 gap-2">
+                {m.statusCounts.map((s) => (
+                  <li key={s.name} className="flex items-center justify-between rounded-lg border bg-surface-2/40 px-2.5 py-2">
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.name}
+                    </span>
+                    <span className="font-mono text-sm tabular-nums">{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Panel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Change Order Value by Status */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Change Order Value by Status ($K)</CardTitle></CardHeader>
-          <CardContent>
-            {coByStatus.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">No change order data</div>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-[220px]">
-                <BarChart data={coByStatus} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis type="number" className="text-xs" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" className="text-xs" tick={{ fontSize: 10 }} width={80} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 2, 2, 0]} />
-                </BarChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
+        {/* Burn vs progress */}
+        <Panel
+          className="lg:col-span-7"
+          eyebrow="Earned value"
+          title="Spend vs. progress"
+          description={projects.length ? (m.ahead ? `${m.ahead} active project${m.ahead === 1 ? " is" : "s are"} spending ahead of progress` : "Spend is tracking progress across active projects") : undefined}
+          actions={<ChartLegend className="hidden sm:flex" items={PROJECT_STATUSES.map((s) => ({ label: s, color: STATUS_CHART_COLOR[s], shape: "dot" as const }))} />}
+        >
+          {pLoading ? <Shimmer className="h-[280px]" /> : m.burnData.length === 0 ? (
+            <EmptyState compact icon={Activity} title="Nothing to plot" description="Each project appears as a point: progress against budget burn." />
+          ) : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 10, right: 12, left: -4, bottom: 4 }}>
+                  <CartesianGrid {...gridProps} vertical />
+                  <XAxis type="number" dataKey="progress" name="Progress" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" {...axisProps} />
+                  <YAxis type="number" dataKey="burn" name="Budget burn" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" {...axisProps} width={48} allowDataOverflow={false} />
+                  <ZAxis type="number" dataKey="budget" range={[60, 360]} />
+                  <ReferenceLine
+                    segment={[{ x: 0, y: 0 }, { x: 100, y: 100 }]}
+                    stroke={CHART.muted}
+                    strokeDasharray="4 4"
+                    ifOverflow="extendDomain"
+                    label={{ value: "spend = progress", position: "insideTopLeft", fill: CHART.muted, fontSize: 10.5 }}
+                  />
+                  <Tooltip
+                    {...tooltipProps}
+                    cursor={{ strokeDasharray: "3 3", stroke: "hsl(var(--border-strong))" }}
+                    content={({ active, payload }) => {
+                      const d = active && payload?.[0]?.payload;
+                      if (!d) return null;
+                      return (
+                        <div style={tooltipProps.contentStyle}>
+                          <p className="mb-1 text-[12px] font-medium">{d.name}</p>
+                          <p className="font-mono text-[11px] text-muted-foreground">
+                            {d.progress}% complete · {d.burn}% spent · {money(d.budget)}
+                          </p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Scatter data={m.burnData} fillOpacity={0.85} isAnimationActive={anim}>
+                    {m.burnData.map((d) => <Cell key={d.name} fill={STATUS_CHART_COLOR[d.status] ?? CHART.muted} />)}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
 
-        {/* Budget Utilization by Category */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Budget Utilization by Category ($K)</CardTitle></CardHeader>
-          <CardContent>
-            {budgetCategoryData.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">No budget data</div>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-[220px]">
-                <BarChart data={budgetCategoryData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="name" className="text-xs" tick={{ fontSize: 10 }} />
-                  <YAxis className="text-xs" tick={{ fontSize: 10 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="budget" fill="var(--color-budget)" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="actual" fill="var(--color-actual)" radius={[2, 2, 0, 0]} />
+        {/* RFI pipeline */}
+        <Panel
+          className="lg:col-span-5"
+          eyebrow="Coordination"
+          title="RFIs by priority"
+          actions={m.rfiStatusesPresent.length ? <ChartLegend className="hidden sm:flex" items={m.rfiStatusesPresent.map((s) => ({ label: s.key, color: s.color }))} /> : undefined}
+        >
+          {rLoading ? <Shimmer className="h-[280px]" /> : rfis.length === 0 ? (
+            <EmptyState compact icon={FileText} title="No RFIs" description="Open and answered RFIs stack here by priority." />
+          ) : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={m.rfiStack} margin={{ top: 10, right: 4, left: -24, bottom: 0 }} barCategoryGap="28%">
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="priority" {...axisProps} />
+                  <YAxis allowDecimals={false} {...axisProps} />
+                  <Tooltip {...tooltipProps} />
+                  {m.rfiStatusesPresent.map((s, i) => (
+                    <Bar
+                      key={s.key}
+                      dataKey={s.key}
+                      stackId="rfi"
+                      fill={s.color}
+                      radius={i === m.rfiStatusesPresent.length - 1 ? [4, 4, 0, 0] : 0}
+                      maxBarSize={56}
+                      isAnimationActive={anim}
+                    />
+                  ))}
                 </BarChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        {/* Budget by category */}
+        <Panel
+          className="lg:col-span-7"
+          eyebrow="Cost codes"
+          title="Budget utilization by category"
+          actions={<ChartLegend className="hidden sm:flex" items={[{ label: "Allocated", color: CHART.grid }, { label: "Spent", color: CHART.data }, { label: "≥ 85%", color: CHART.warning }]} />}
+        >
+          {bLoading ? <Shimmer className="h-[300px]" /> : m.budgetCategoryData.length === 0 ? (
+            <EmptyState compact icon={CircleDollarSign} title="No budget lines" description="Add budget categories in Ops to track utilization." />
+          ) : (
+            <div style={{ height: bulletH(m.budgetCategoryData.length) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={m.budgetCategoryData} layout="vertical" margin={{ top: 0, right: 44, left: 0, bottom: 0 }} barGap={-12} barCategoryGap={10}>
+                  <CartesianGrid {...gridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...axisProps} tickFormatter={(v) => money(v)} />
+                  <YAxis type="category" dataKey="label" {...axisProps} width={128} tick={<NameTick max={18} />} />
+                  <Tooltip
+                    {...tooltipProps}
+                    labelFormatter={(_l, p) => p?.[0]?.payload?.name ?? ""}
+                    formatter={(v: number, k) => [money(v), k === "budget" ? "Allocated" : "Spent"]}
+                  />
+                  <Bar dataKey="budget" fill={CHART.grid} radius={4} barSize={12} isAnimationActive={false} />
+                  <Bar dataKey="actual" radius={4} barSize={12} isAnimationActive={anim}>
+                    {m.budgetCategoryData.map((d) => (
+                      <Cell key={d.name} fill={d.util >= 95 ? CHART.destructive : d.util >= 85 ? CHART.warning : CHART.data} />
+                    ))}
+                    <LabelList dataKey="util" position="right" formatter={(v: number) => `${v}%`} className="fill-muted-foreground font-mono text-[10.5px]" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        {/* Change orders */}
+        <Panel
+          className="lg:col-span-5"
+          eyebrow="Change orders"
+          title="Value by status"
+        >
+          {coLoading ? <Shimmer className="h-[220px]" /> : m.coByStatus.length === 0 ? (
+            <EmptyState compact icon={FileText} title="No change orders" description="Change order exposure by status will appear here." />
+          ) : (
+            <div className="space-y-5">
+            <div className="flex items-end justify-between gap-4 border-b pb-4">
+              <div>
+                <p className={cn("font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums", m.coNet > 0 ? "text-foreground" : "text-success")}>{money(m.coNet)}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  net exposure · {m.coLive} live change order{m.coLive === 1 ? "" : "s"}
+                  {m.totalBudget > 0 && <> · <span className="font-mono">{((m.coNet / m.totalBudget) * 100).toFixed(2)}%</span> of budget</>}
+                </p>
+              </div>
+              <FileText className="mb-1 h-5 w-5 text-muted-foreground/60" />
+            </div>
+            <ul className="space-y-3.5">
+              {(() => {
+                const max = Math.max(...m.coByStatus.map((d) => Math.abs(d.value)), 1);
+                return m.coByStatus.map((d) => (
+                  <li key={d.name} className="space-y-1.5">
+                    <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-[2px]" style={{ background: d.color }} />
+                        {d.name}
+                        <span className="font-mono text-[11px] text-muted-foreground">×{d.count}</span>
+                      </span>
+                      <span className="font-mono tabular-nums">{money(d.value)}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full rounded-full transition-[width] duration-700 ease-out-expo" style={{ width: `${(Math.abs(d.value) / max) * 100}%`, background: d.color }} />
+                    </div>
+                  </li>
+                ));
+              })()}
+            </ul>
+            </div>
+          )}
+        </Panel>
+      </section>
     </div>
   );
 }
