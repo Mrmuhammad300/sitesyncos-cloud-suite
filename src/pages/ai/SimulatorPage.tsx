@@ -255,7 +255,7 @@ export default function SimulatorPage() {
                   <MiniStat icon={ShieldAlert} label="Risk score">
                     <span className={cn(results.riskScore > 60 ? "text-destructive" : results.riskScore > 40 ? "text-warning" : "text-success")}>{results.riskScore}</span>
                     <span className="text-xs text-muted-foreground">/100</span>
-                    <Meter value={results.riskScore} risk className="mt-2" />
+                    <Meter value={results.riskScore} tone={results.riskScore > 60 ? "destructive" : results.riskScore > 40 ? "warning" : "success"} className="mt-2" />
                   </MiniStat>
                   <MiniStat icon={Gauge} label="Confidence">
                     {results.confidence}<span className="text-xs text-muted-foreground">%</span>
@@ -315,7 +315,7 @@ export default function SimulatorPage() {
                 ) : (
                   <ul className="divide-y divide-border/70 border-t">
                     {projectImpact.map((p) => (
-                      <li key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_120px_110px_120px]">
+                      <li key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_96px_120px_150px]">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-medium">{p.name}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">{fmtDollar(p.rem)} to complete</p>
@@ -326,7 +326,7 @@ export default function SimulatorPage() {
                         <span className="hidden text-right font-mono text-[11px] tabular-nums text-muted-foreground sm:block">
                           {p.budget > 0 ? `${p.impact >= 0 ? "+" : ""}${((p.impact / p.budget) * 100).toFixed(1)}% of budget` : "—"}
                         </span>
-                        <span className="col-span-2 font-mono text-[11px] tabular-nums text-muted-foreground sm:col-span-1 sm:text-right">
+                        <span className="col-span-2 whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground sm:col-span-1 sm:text-right">
                           {p.shifted ? (
                             <>
                               finish {p.shifted.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}

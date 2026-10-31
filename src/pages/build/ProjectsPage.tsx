@@ -215,8 +215,8 @@ export default function ProjectsPage() {
           label="Needs attention"
           value={m.behind + m.atRisk}
           icon={AlertTriangle}
-          tone={m.behind ? "destructive" : m.atRisk ? "warning" : "success"}
-          hint={m.behind + m.atRisk === 0 ? "All on track" : `${m.behind} behind · ${m.atRisk} at risk`}
+          tone={m.behind ? "destructive" : m.atRisk ? "warning" : projects.length ? "success" : "default"}
+          hint={!projects.length ? "No projects yet" : m.behind + m.atRisk === 0 ? "All on track" : `${m.behind} behind · ${m.atRisk} at risk`}
           loading={isLoading}
           onClick={m.behind + m.atRisk > 0 ? () => setStatusFilter(m.behind ? "Behind" : "At Risk") : undefined}
         />
@@ -238,7 +238,7 @@ export default function ProjectsPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search name or location…" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[150px] sm:flex-none" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}

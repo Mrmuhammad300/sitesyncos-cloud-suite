@@ -147,15 +147,15 @@ export default function SchedulePage() {
           label="On plan"
           value={m.onPlan}
           icon={Flag}
-          tone="success"
-          hint={`Avg ${m.avgGap >= 0 ? "+" : "−"}${Math.abs(m.avgGap)} pts vs time used`}
+          tone={m.onPlan ? "success" : "default"}
+          hint={!m.active.length ? "No active projects" : `Avg ${m.avgGap >= 0 ? "+" : "−"}${Math.abs(m.avgGap)} pts vs time used`}
           loading={isLoading}
         />
         <StatCard
           label="Behind plan"
           value={m.behindPlan.length}
           icon={TrendingDown}
-          tone={m.behindPlan.length ? "destructive" : "success"}
+          tone={m.behindPlan.length ? "destructive" : m.active.length ? "success" : "default"}
           hint={m.worst ? `${m.worst.p.name.split(" ").slice(0, 2).join(" ")} ${m.worst.v.gap} pts` : "> 10 pts behind the clock"}
           loading={isLoading}
         />

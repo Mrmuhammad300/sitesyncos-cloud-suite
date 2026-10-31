@@ -251,7 +251,7 @@ export default function DailyReportsPage() {
           label="Days since incident"
           value={m.daysSinceIncident === null ? (reports.length ? "None" : "—") : `${m.daysSinceIncident}d`}
           icon={m.totalSafetyIncidents ? ShieldAlert : ShieldCheck}
-          tone={m.daysSinceIncident !== null && m.daysSinceIncident < 7 ? "destructive" : "success"}
+          tone={m.daysSinceIncident !== null && m.daysSinceIncident < 7 ? "destructive" : reports.length ? "success" : "default"}
           hint={`${m.totalSafetyIncidents} incident${m.totalSafetyIncidents === 1 ? "" : "s"} logged`}
           loading={isLoading}
           onClick={m.totalSafetyIncidents ? () => setSafetyFilter("incident") : undefined}
@@ -344,7 +344,7 @@ export default function DailyReportsPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search report #, author, weather…" />
               <Select value={safetyFilter} onValueChange={setSafetyFilter}>
-                <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Filter reports"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[150px] sm:flex-none" aria-label="Filter reports"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SAFETY_FILTERS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>

@@ -124,7 +124,7 @@ export default function TeamPage() {
         description="Everyone with access to this workspace, and what they're allowed to do."
         actions={
           <>
-            {isAdmin && <StatusPill status="Admin view" tone="primary"><Shield className="h-3 w-3" />Admin view</StatusPill>}
+            {isAdmin && <StatusPill status="Admin view" tone="primary" />}
             <Button variant="outline" onClick={() => toast.info("New members join by signing up with your organization's email domain.")}>
               <UserPlus /> Invite
             </Button>

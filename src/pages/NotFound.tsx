@@ -53,10 +53,10 @@ const NotFound = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.error("404: Route not found —", location.pathname);
+    console.warn("404: Route not found —", location.pathname);
   }, [location.pathname]);
 
-  const shortcuts = MODULES.filter((m) => m.key !== "overview").map((m) => ({ module: m, item: m.items[0] }));
+  const shortcuts = MODULES.filter((m) => m.key !== "overview" && m.key !== "system").map((m) => ({ module: m, item: m.items[0] }));
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 py-2 sm:py-6">

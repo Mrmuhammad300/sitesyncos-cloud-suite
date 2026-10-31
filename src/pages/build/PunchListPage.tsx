@@ -159,7 +159,7 @@ export default function PunchListPage() {
           label="Overdue"
           value={m.overdue}
           icon={AlarmClock}
-          tone={m.overdue ? "destructive" : "success"}
+          tone={m.overdue ? "destructive" : m.remaining.length ? "success" : "default"}
           hint={m.overdue ? "Past their due date" : "Nothing past due"}
           loading={isLoading}
         />
@@ -237,7 +237,7 @@ export default function PunchListPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search title or item #…" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[150px] sm:flex-none" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}

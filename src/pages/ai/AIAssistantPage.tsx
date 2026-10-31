@@ -114,9 +114,9 @@ export default function AIAssistantPage() {
 
       {tab !== "ask" && (
         <section className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Active agents" value={<>{activeCount}<span className="text-base text-muted-foreground">/{agents?.length ?? 0}</span></>} icon={Radio} tone={activeCount ? "success" : "default"} loading={!agents} />
+          <StatCard label="Active agents" value={<>{activeCount}<span className="text-base text-muted-foreground">/{agents?.length ?? 0}</span></>} icon={Radio} tone={activeCount ? "success" : "default"} hint="Agents online" loading={!agents} />
           <StatCard label="Completed runs" value={completedCount} icon={CheckCircle2} hint={`of ${executions?.length ?? 0} recent`} loading={execLoading} />
-          <StatCard label="Avg confidence" value={`${avgConfidence}%`} icon={Gauge} tone={Number(avgConfidence) >= 80 ? "success" : "default"} loading={execLoading} />
+          <StatCard label="Avg confidence" value={`${avgConfidence}%`} icon={Gauge} tone={Number(avgConfidence) >= 80 ? "success" : "default"} hint="Across recent runs" loading={execLoading} />
           <StatCard
             label="Pending approvals"
             value={pendingApprovals.length}

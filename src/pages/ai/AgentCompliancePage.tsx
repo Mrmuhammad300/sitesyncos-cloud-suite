@@ -304,7 +304,7 @@ export default function AgentCompliancePage() {
               onClick={() => setFrameworkFilter("all")}
               primary
             />
-            {(frameworks.length ? frameworks : [...FRAMEWORKS]).map((fw) => (
+            {frameworks.map((fw) => (
               <CoverageCard
                 key={fw}
                 label={fw}

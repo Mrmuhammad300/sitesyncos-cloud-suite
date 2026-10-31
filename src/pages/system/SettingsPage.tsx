@@ -80,9 +80,9 @@ function ThemePreview({ invert }: { invert: boolean }) {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({ label, hint, children, stack }: { label: string; hint?: string; children: ReactNode; stack?: boolean }) {
   return (
-    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className={cn("flex gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between", stack ? "flex-col" : "flex-row items-center justify-between")}>
       <div className="min-w-0">
         <p className="text-[13.5px] font-medium">{label}</p>
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -210,7 +210,7 @@ export default function SettingsPage() {
 
           {/* Appearance */}
           <Panel id="settings-appearance" eyebrow="Appearance" title="Theme" description="Saved to this device. Applies instantly." className="scroll-mt-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Theme">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="radiogroup" aria-label="Theme">
               {themes.map(({ key, label, icon: Icon, hint }) => {
                 const selected = theme === key;
                 const invertFor = (t: "light" | "dark") => (t === "light" ? dark : !dark);
@@ -240,10 +240,10 @@ export default function SettingsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-2.5">
+                    <div className="flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5">
                       <Icon className={cn("h-4 w-4", selected ? "text-primary" : "text-muted-foreground")} />
                       <span className="text-[13px] font-medium">{label}</span>
-                      <span className="ml-auto text-[11px] text-muted-foreground">{hint}</span>
+                      <span className="ml-auto hidden text-[11px] text-muted-foreground md:inline">{hint}</span>
                     </div>
                   </button>
                 );
@@ -259,7 +259,7 @@ export default function SettingsPage() {
           {/* Workspace */}
           <Panel id="settings-workspace" eyebrow="Workspace" title="Defaults" className="scroll-mt-6">
             <div className="divide-y">
-              <Field label="Default landing page" hint="Where SiteSync opens after sign-in">
+              <Field stack label="Default landing page" hint="Where SiteSync opens after sign-in">
                 <Select value={prefs.landingPage} onValueChange={(v) => setPrefs((p) => ({ ...p, landingPage: v }))}>
                   <SelectTrigger className="w-full sm:w-[200px]" aria-label="Default landing page"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -269,7 +269,7 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Measurement units" hint="Used for areas and dimensions in Spatial">
+              <Field stack label="Measurement units" hint="Used for areas and dimensions in Spatial">
                 <div className="grid grid-cols-2 rounded-lg border bg-surface-2/60 p-0.5" role="radiogroup" aria-label="Units">
                   {(["imperial", "metric"] as const).map((u) => (
                     <button
@@ -277,9 +277,9 @@ export default function SettingsPage() {
                       role="radio"
                       aria-checked={prefs.units === u}
                       onClick={() => setPrefs((p) => ({ ...p, units: u }))}
-                      className={cn("h-7 rounded-md px-3 text-xs font-medium capitalize transition-colors", prefs.units === u ? "bg-surface-1 text-foreground shadow-[0_0_0_1px_hsl(var(--border))]" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("h-7 rounded-md px-3 text-xs font-medium transition-colors", prefs.units === u ? "bg-surface-1 text-foreground shadow-[0_0_0_1px_hsl(var(--border))]" : "text-muted-foreground hover:text-foreground")}
                     >
-                      {u} <span className="ss-num text-muted-foreground">{u === "imperial" ? "ft" : "m"}</span>
+                      <span className="capitalize">{u}</span> <span className="ss-num text-muted-foreground">{u === "imperial" ? "ft" : "m"}</span>
                     </button>
                   ))}
                 </div>
@@ -297,7 +297,7 @@ export default function SettingsPage() {
                   hint={item.desc}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={cn("ss-pill font-mono text-[10px] uppercase tracking-wider", MOD_TAG[item.module])}>{item.module}</span>
+                    <span className={cn("ss-pill hidden font-mono sm:inline-flex text-[10px] uppercase tracking-wider", MOD_TAG[item.module])}>{item.module}</span>
                     <Switch defaultChecked aria-label={item.label} />
                   </div>
                 </Field>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
           {/* Security */}
           <Panel id="settings-security" eyebrow="Security" title="Password & session" className="scroll-mt-6">
             <div className="divide-y">
-              <Field label="Password" hint={`A reset link will be sent to ${user?.email ?? "your email"}.`}>
+              <Field stack label="Password" hint={`A reset link will be sent to ${user?.email ?? "your email"}.`}>
                 <Button size="sm" variant="outline" onClick={handleChangePassword}>
                   <KeyRound /> Send reset email
                 </Button>

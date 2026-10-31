@@ -184,7 +184,7 @@ export default function RFIsPage() {
           label="Overdue"
           value={m.buckets.late}
           icon={AlarmClock}
-          tone={m.buckets.late ? "destructive" : "success"}
+          tone={m.buckets.late ? "destructive" : m.openRfis.length ? "success" : "default"}
           hint={m.buckets.late ? `Oldest ${m.oldestLate}d past due` : "Nothing past due"}
           loading={isLoading}
           onClick={m.buckets.late ? () => setDueFilter("late") : undefined}
@@ -197,7 +197,7 @@ export default function RFIsPage() {
           hint={m.stale ? `${m.stale} open > 2 weeks` : "None older than 2 weeks"}
           loading={isLoading}
         />
-        <StatCard label="Resolved" value={`${m.resolvedPct}%`} icon={CheckCircle2} tone="success" hint={`${m.answered} answered · ${m.closed} closed`} loading={isLoading} />
+        <StatCard label="Resolved" value={`${m.resolvedPct}%`} icon={CheckCircle2} tone={rfis.length ? "success" : "default"} hint={`${m.answered} answered · ${m.closed} closed`} loading={isLoading} />
       </section>
 
       {!empty && m.openRfis.length > 0 && (
@@ -239,7 +239,7 @@ export default function RFIsPage() {
             <Toolbar>
               <SearchField value={search} onChange={setSearch} placeholder="Search subject or RFI #…" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-[140px] text-xs" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[140px] sm:flex-none" aria-label="Filter by status"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -247,7 +247,7 @@ export default function RFIsPage() {
               </Select>
               {projects.length > 0 && (
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="h-9 w-[180px] text-xs" aria-label="Filter by project"><SelectValue placeholder="All projects" /></SelectTrigger>
+                  <SelectTrigger className="h-9 min-w-0 flex-1 text-xs sm:w-[180px] sm:flex-none" aria-label="Filter by project"><SelectValue placeholder="All projects" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All projects</SelectItem>
                     {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}

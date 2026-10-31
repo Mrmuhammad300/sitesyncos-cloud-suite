@@ -174,12 +174,12 @@ export default function AnalyticsPage() {
           tone={m.criticalRFIs > 0 ? "warning" : "default"}
           loading={rLoading}
         />
-        <StatCard label="Avg progress" value={`${m.avgProgress}%`} icon={Activity} hint={`${projects.length} projects tracked`} loading={pLoading} />
+        <StatCard label="Avg progress" value={projects.length ? `${m.avgProgress}%` : "—"} icon={Activity} hint={`${projects.length} projects tracked`} loading={pLoading} />
         <StatCard
           label="On-time rate"
-          value={`${m.onTimeRate}%`}
+          value={projects.length ? `${m.onTimeRate}%` : "—"}
           icon={Target}
-          hint={m.onTimeRate >= 80 ? "Above 80% target" : "Below 80% target"}
+          hint={!projects.length ? "80% target" : m.onTimeRate >= 80 ? "Above 80% target" : "Below 80% target"}
           tone={projects.length ? (m.onTimeRate >= 80 ? "success" : "warning") : "default"}
           loading={pLoading}
         />

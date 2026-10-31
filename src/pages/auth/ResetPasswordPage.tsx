@@ -36,8 +36,8 @@ function RecoveryMark() {
           const t = (i - 4) * 30;
           return (
             <g key={i}>
-              <line x1={cx - 240 + t * 2} y1={420 + 30 - t} x2={cx + t * 2} y2={420 + 150 - t} />
-              <line x1={cx + 240 + t * 2} y1={420 + 30 + t} x2={cx + t * 2} y2={420 - 90 + t} />
+              <line x1={cx - 240 + t * 2} y1={330 + 30 - t} x2={cx + t * 2} y2={330 + 150 - t} />
+              <line x1={cx + 240 + t * 2} y1={330 + 30 + t} x2={cx + t * 2} y2={330 - 90 + t} />
             </g>
           );
         })}
@@ -61,7 +61,6 @@ function RecoveryMark() {
       {/* key beam */}
       <g stroke="hsl(var(--data) / 0.8)" strokeWidth="1.25" fill="none" className="animate-draw" style={{ ["--len" as string]: 500, animationDelay: "1.3s" }}>
         <path d={`M${cx},245 L${cx},110 M${cx - 18},128 L${cx},110 L${cx + 18},128`} />
-        <path d={`M${cx + 70},110 L${cx + 160},110`} strokeDasharray="2 3" />
       </g>
       {[[cx - 150, 245, "A1"], [cx + 150, 245, "B1"], [cx, 110, "RST"]].map(([x, y, l], i) => (
         <g key={i} className="animate-fade-in" style={{ animationDelay: `${1.6 + i * 0.15}s` }}>

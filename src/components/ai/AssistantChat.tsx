@@ -103,10 +103,14 @@ export function AssistantChat() {
 
   /* Keep the newest message in view while the user is near the bottom. */
   const scrollToEnd = useCallback((force = false) => {
+    // The app scrolls inside #main-scroll; the composer is sticky at its bottom,
+    // so "scrolled to the end" means the container's max scroll position.
     const sc = document.getElementById("main-scroll");
-    if (!sc || !endRef.current) return;
-    const nearBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 240;
-    if (force || nearBottom) endRef.current.scrollIntoView({ block: "end", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    if (!sc) return;
+    const nearBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 280;
+    if (force || nearBottom) {
+      sc.scrollTo({ top: sc.scrollHeight, behavior: force && !prefersReducedMotion() ? "smooth" : "auto" });
+    }
   }, []);
 
   useEffect(() => { scrollToEnd(); }, [messages, revealed, scrollToEnd]);
