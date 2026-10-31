@@ -25,8 +25,8 @@ export interface RoiYear {
   cumulative: number;
 }
 
-/** Share of the original loan assumed outstanding at exit (original model assumption). */
-export const EXIT_LOAN_BALANCE = 0.85;
+// Debt service is interest-only, so the full principal is still owed at sale.
+export const EXIT_LOAN_BALANCE = 1;
 
 export function runRoiModel(i: RoiInputs) {
   const capRate = (i.noi / i.purchasePrice) * 100;
