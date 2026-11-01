@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Sparkles, RefreshCw, Zap } from "lucide-react";
@@ -14,8 +13,8 @@ interface AiInsightCardProps {
 }
 
 const providerLabels: Record<string, { label: string; color: string }> = {
-  lovable: { label: "Gemini", color: "border-primary/30 text-primary" },
-  claude: { label: "Claude", color: "border-purple-500/30 text-purple-500" },
+  lovable: { label: "Gemini", color: "border-data/30 text-data" },
+  claude: { label: "Claude", color: "border-primary/30 text-primary" },
 };
 
 export function AiInsightCard({ type, title, agentName, icon }: AiInsightCardProps) {
@@ -40,86 +39,75 @@ export function AiInsightCard({ type, title, agentName, icon }: AiInsightCardPro
 
       setInsight(data.insight);
       setUsedProvider(data.provider);
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to get AI insight");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to get AI insight");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="border-primary/10 bg-gradient-to-br from-background to-primary/5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {icon ?? <Brain className="h-4 w-4 text-primary" />}
-            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+    <section className="ss-card relative overflow-hidden">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-mod-ai/10 blur-3xl" />
+      <div className="relative flex items-center justify-between gap-3 px-5 pt-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface-2">
+            {icon ?? <Brain className="h-4 w-4 text-mod-ai" />}
+          </span>
+          <div className="min-w-0">
+            <p className="ss-eyebrow">AI insight</p>
+            <h3 className="truncate text-[14px] font-semibold tracking-tight">{title}</h3>
           </div>
-          <Badge variant="outline" className="text-[10px] font-mono">
-            {agentName}
-          </Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        <Badge variant="outline" className="font-mono">{agentName}</Badge>
+      </div>
+      <div className="relative space-y-3 p-5 pt-4">
         {!insight && !loading && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">
-              Get AI-powered analysis from {agentName}
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-muted-foreground">
+              Run a live analysis of your portfolio with {agentName}. Results are generated on demand from current data.
             </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="default"
-                className="text-xs h-7"
-                onClick={() => { setProvider("lovable"); fetchInsight("lovable"); }}
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                Analyze (Gemini)
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => { setProvider("claude"); fetchInsight("claude"); }}>
+                <Zap /> Analyze with Claude
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs h-7"
-                onClick={() => { setProvider("claude"); fetchInsight("claude"); }}
-              >
-                <Zap className="h-3 w-3 mr-1" />
-                Analyze (Claude)
+              <Button size="sm" variant="outline" onClick={() => { setProvider("lovable"); fetchInsight("lovable"); }}>
+                <Sparkles /> Gemini
               </Button>
             </div>
           </div>
         )}
 
         {loading && (
-          <div className="flex items-center gap-2 py-4">
-            <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-            <span className="text-sm text-muted-foreground">{agentName} analyzing…</span>
+          <div className="space-y-2 py-1" role="status">
+            <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
+              {agentName} is analyzing…
+            </div>
+            {[92, 78, 85].map((w, i) => (
+              <div key={i} className="h-3 animate-shimmer rounded bg-[linear-gradient(90deg,hsl(var(--muted))_0%,hsl(var(--surface-3))_50%,hsl(var(--muted))_100%)] bg-[length:200%_100%]" style={{ width: `${w}%` }} />
+            ))}
           </div>
         )}
 
         {insight && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
               {usedProvider && (
-                <Badge variant="outline" className={`text-[10px] ${providerLabels[usedProvider]?.color ?? ""}`}>
+                <Badge variant="outline" className={providerLabels[usedProvider]?.color ?? ""}>
                   {providerLabels[usedProvider]?.label ?? usedProvider}
                 </Badge>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] ml-auto"
-                onClick={() => fetchInsight()}
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
+              <Button size="xs" variant="ghost" className="ml-auto" onClick={() => fetchInsight()}>
+                <RefreshCw /> Refresh
               </Button>
             </div>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
+            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-[13px] leading-relaxed dark:prose-invert">
               {insight}
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

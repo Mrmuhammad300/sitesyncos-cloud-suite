@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "./PageTransition";
-import ModulePage from "@/pages/ModulePage";
+import { RouteLoader } from "@/components/os/Loaders";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ProjectsPage = lazy(() => import("@/pages/build/ProjectsPage"));
@@ -39,11 +39,6 @@ const TeamPage = lazy(() => import("@/pages/system/TeamPage"));
 const AuditLogPage = lazy(() => import("@/pages/system/AuditLogPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-const Loading = () => (
-  <div className="flex items-center justify-center h-full min-h-[200px]">
-    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-  </div>
-);
 
 export function AnimatedRoutes() {
   const location = useLocation();
@@ -51,7 +46,7 @@ export function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <PageTransition key={location.pathname}>
-        <Suspense fallback={<Loading />}>
+        <Suspense fallback={<RouteLoader />}>
           <Routes location={location}>
             <Route path="/" element={<Dashboard />} />
             {/* Build */}

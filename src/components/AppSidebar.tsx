@@ -1,162 +1,174 @@
-import {
-  Building2, BarChart3, Wallet, Brain, Box, Users, Home, FileText, HardHat,
-  DollarSign, TrendingUp, ClipboardList, Wrench, FolderOpen, Calculator,
-  Landmark, Shield, Layers, Cpu, Activity, Compass, Briefcase, CreditCard,
-  LayoutDashboard, Settings, Bell, CheckSquare, UserCog, ScrollText,
-  Wand2, AlertTriangle, MessageSquare, ShieldCheck
-} from "lucide-react";
-import { NavLink } from "@/components/NavLink";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { NavLink } from "@/components/NavLink";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
-  SidebarHeader, SidebarFooter, useSidebar,
+  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BrandMark } from "@/components/os/BrandMark";
+import { MODULES, getRouteMeta, type ModuleKey } from "@/lib/modules";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
-const moduleGroups = [
-  {
-    label: "Overview",
-    items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "Notifications", url: "/notifications", icon: Bell },
-    ],
-  },
-  {
-    label: "SiteSync Vault",
-    items: [
-      { title: "Properties", url: "/vault/properties", icon: Building2 },
-      { title: "ROI Calculator", url: "/vault/roi", icon: Calculator },
-      { title: "Lender Portal", url: "/vault/lender", icon: Landmark },
-      { title: "Compliance", url: "/vault/compliance", icon: Shield },
-    ],
-  },
-  {
-    label: "SiteSync Build",
-    items: [
-      { title: "Projects", url: "/build/projects", icon: HardHat },
-      { title: "RFIs", url: "/build/rfis", icon: FileText },
-      { title: "Submittals", url: "/build/submittals", icon: ClipboardList },
-      { title: "Change Orders", url: "/build/change-orders", icon: Layers },
-      { title: "Daily Reports", url: "/build/daily-reports", icon: Activity },
-      { title: "Schedule", url: "/build/schedule", icon: BarChart3 },
-      { title: "Punch List", url: "/build/punch-list", icon: CheckSquare },
-    ],
-  },
-  {
-    label: "SiteSync Ops",
-    items: [
-      { title: "Cost Dashboard", url: "/ops/cost-dashboard", icon: TrendingUp },
-      { title: "Budgets", url: "/ops/budgets", icon: DollarSign },
-      { title: "Draw Requests", url: "/ops/draws", icon: CreditCard },
-      { title: "Tenants", url: "/ops/tenants", icon: Users },
-      { title: "Work Orders", url: "/ops/work-orders", icon: Wrench },
-      { title: "Documents", url: "/ops/documents", icon: FolderOpen },
-    ],
-  },
-  {
-    label: "Quantum Ledger",
-    items: [
-      { title: "Ledger", url: "/treasury/ledger", icon: Wallet },
-      { title: "Milestones", url: "/treasury/milestones", icon: TrendingUp },
-      { title: "Approvals", url: "/treasury/approvals", icon: Briefcase },
-    ],
-  },
-  {
-    label: "AI & Intelligence",
-    items: [
-      { title: "Agents", url: "/ai/agents", icon: Brain },
-      { title: "Analytics", url: "/ai/analytics", icon: Cpu },
-      { title: "Simulator", url: "/ai/simulator", icon: Compass },
-      { title: "Automation Compliance", url: "/ai/compliance", icon: ShieldCheck },
-    ],
-  },
-  {
-    label: "Spatial Workbench",
-    items: [
-      { title: "3D Viewer", url: "/spatial/viewer", icon: Box },
-      { title: "Floor Plans", url: "/spatial/plans", icon: Home },
-      { title: "3D Generator", url: "/spatial/generator", icon: Wand2 },
-      { title: "Clash Analysis", url: "/spatial/clash", icon: AlertTriangle },
-      { title: "Design Assistant", url: "/spatial/design-assistant", icon: MessageSquare },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { title: "Team", url: "/team", icon: UserCog },
-      { title: "Audit Log", url: "/audit-log", icon: ScrollText },
-    ],
-  },
-];
+const COLLAPSE_KEY = "sitesync-nav-collapsed";
+
+function readCollapsed(): Partial<Record<ModuleKey, boolean>> {
+  try {
+    return JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
-  const location = useLocation();
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
+  const { pathname } = useLocation();
+  const activeModule = getRouteMeta(pathname)?.module.key;
+  const { profile, user } = useAuth();
+  const [closedGroups, setClosedGroups] = useState(readCollapsed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify(closedGroups));
+    } catch {
+      /* ignore */
+    }
+  }, [closedGroups]);
+
+  // Close the mobile drawer after navigating.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
+
+  const displayName = profile?.display_name || user?.email?.split("@")[0] || "Operator";
+  const initials = displayName.split(/[\s._-]+/).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="px-4 py-5">
-        <NavLink to="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Building2 className="h-4.5 w-4.5 text-primary-foreground" />
-          </div>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <SidebarHeader className="px-3 pb-2 pt-3.5">
+        <NavLink to="/" className="group flex items-center gap-2.5 rounded-lg px-1 py-1" aria-label="SiteSync OS home">
+          <BrandMark className="h-8 w-8 shrink-0 transition-transform duration-500 ease-out-expo group-hover:rotate-[-6deg]" />
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight text-sidebar-foreground">BuildOS</span>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-sidebar-muted">SiteSync</span>
+            <div className="flex min-w-0 flex-col leading-none">
+              <span className="flex items-center gap-1.5 text-[15px] font-semibold tracking-tight text-sidebar-foreground">
+                SiteSync
+                <span className="rounded border border-sidebar-border px-1 py-px font-mono text-[9px] font-medium tracking-widest text-sidebar-muted">
+                  OS
+                </span>
+              </span>
+              <span className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.14em] text-sidebar-muted">
+                Build · Operate · Own
+              </span>
             </div>
           )}
         </NavLink>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
-        {moduleGroups.map((group, gi) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted px-3 mb-1">
-              {!collapsed && group.label}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild size="sm">
-                      <NavLink
-                        to={item.url}
-                        end={item.url === "/"}
-                        className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-semibold"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-            {gi < moduleGroups.length - 1 && <Separator className="my-2 bg-sidebar-border" />}
-          </SidebarGroup>
-        ))}
+      <SidebarContent className="gap-0 px-2 pb-2">
+        {MODULES.map((group) => {
+          const isOpen = collapsed || !closedGroups[group.key] || group.key === activeModule;
+          const isActiveGroup = group.key === activeModule;
+          return (
+            <Collapsible
+              key={group.key}
+              open={isOpen}
+              onOpenChange={(o) => setClosedGroups((prev) => ({ ...prev, [group.key]: !o }))}
+            >
+              <SidebarGroup className="px-0 py-1">
+                {!collapsed ? (
+                  <CollapsibleTrigger className="group/trigger flex h-7 w-full items-center gap-2 rounded-md px-2 text-left outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+                    <span className={cn("h-1.5 w-1.5 rounded-[2px]", `bg-${group.tone}`, !isActiveGroup && "opacity-60")} />
+                    <span
+                      className={cn(
+                        "flex-1 font-mono text-[10px] font-medium uppercase tracking-[0.16em]",
+                        isActiveGroup ? "text-sidebar-foreground" : "text-sidebar-muted",
+                      )}
+                    >
+                      {group.label}
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "h-3 w-3 text-sidebar-muted transition-transform duration-200",
+                        isOpen && "rotate-90",
+                      )}
+                    />
+                  </CollapsibleTrigger>
+                ) : (
+                  <div className="mx-auto my-1 h-px w-5 bg-sidebar-border" />
+                )}
+                <CollapsibleContent className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden">
+                  <SidebarGroupContent className="pt-0.5">
+                    <SidebarMenu className="gap-px">
+                      {group.items.map((item) => {
+                        const active = item.url === "/" ? pathname === "/" : pathname === item.url || pathname.startsWith(item.url + "/");
+                        return (
+                          <SidebarMenuItem key={item.url}>
+                            <SidebarMenuButton asChild size="sm" tooltip={item.title} isActive={active} className="h-8">
+                              <NavLink
+                                to={item.url}
+                                end={item.url === "/"}
+                                className={cn(
+                                  "group/item relative flex items-center gap-2.5 rounded-md px-2 text-[13px] font-normal text-sidebar-foreground/65 transition-colors",
+                                  "hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                                  active && "bg-sidebar-accent font-medium text-sidebar-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-border))]",
+                                )}
+                              >
+                                {active && (
+                                  <span className={cn("absolute -left-2 top-1.5 bottom-1.5 w-[2px] rounded-full", `bg-${group.tone}`)} />
+                                )}
+                                <item.icon
+                                  className={cn(
+                                    "h-[15px] w-[15px] shrink-0 transition-colors",
+                                    active ? `text-${group.tone}` : "text-sidebar-muted group-hover/item:text-sidebar-foreground",
+                                  )}
+                                />
+                                <span className="truncate">{item.title}</span>
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </CollapsibleContent>
+              </SidebarGroup>
+            </Collapsible>
+          );
+        })}
       </SidebarContent>
 
-      <SidebarFooter className="px-4 py-3">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild size="sm">
-              <NavLink
-                to="/settings"
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-semibold"
-              >
-                <Settings className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>Settings</span>}
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <NavLink
+          to="/settings"
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-sidebar-accent",
+            collapsed && "justify-center",
+          )}
+        >
+          <div className="relative shrink-0">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-lg object-cover" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/80 to-mod-vault/80 text-[11px] font-semibold text-primary-foreground">
+                {initials}
+              </div>
+            )}
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-success" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[13px] font-medium text-sidebar-foreground">{displayName}</p>
+              <p className="truncate font-mono text-[10px] uppercase tracking-wider text-sidebar-muted">
+                {(profile?.role ?? "member").replace(/_/g, " ")}
+              </p>
+            </div>
+          )}
+        </NavLink>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

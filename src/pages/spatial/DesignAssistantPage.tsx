@@ -1,19 +1,20 @@
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment, PerspectiveCamera, Html } from "@react-three/drei";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { ArrowUp, GitBranch, History, Lightbulb, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, Loader2, Bot, User, CheckCircle2, XCircle, RotateCcw, GitBranch, Lightbulb } from "lucide-react";
+import { BrandMark, PageHeader, Panel, StatusPill } from "@/components/os";
 import { useProjects } from "@/hooks/useProjectData";
-import { useBlenderJobs, useCreateBlenderJob, useBlenderJobStatus } from "@/hooks/useBlenderData";
-import { toast } from "sonner";
-import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
-import { useRef as useThreeRef } from "react";
+import { useCreateBlenderJob } from "@/hooks/useBlenderData";
+import { useAuth } from "@/hooks/useAuth";
+import { useScenePalette, type ScenePalette } from "@/components/spatial/sceneTheme";
+import { AxisGizmo, Readout, SceneFallback, SceneGrid, SceneLights, Viewport, ViewportSlot } from "@/components/spatial/Viewport";
+import { ProceduralBuilding, buildingFraming } from "@/components/spatial/ProceduralBuilding";
+import { buildingHeight, grossFloorArea, specFromPrompt, type BuildingSpec } from "@/lib/spatial/buildingSpec";
+import { applyDesignInstruction, DESIGN_SUGGESTIONS } from "@/lib/spatial/designEdits";
+import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,110 +23,78 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  jobId?: string;
   status?: "pending" | "processing" | "completed" | "failed";
 }
 
-const DESIGN_SUGGESTIONS = [
-  "Make the floor plan more efficient",
-  "Add a breakout lounge area near the kitchen",
-  "Increase natural light by adding skylights",
-  "Reorganize meeting rooms to the perimeter",
-  "Add ADA-compliant pathways throughout",
-  "Optimize circulation for 50 people",
-];
+interface Version {
+  id: string;
+  spec: BuildingSpec;
+  note: string;
+  createdAt: string;
+}
 
-// ─── 3D Scene (evolves with design iterations) ────────────────────────────────
+const SESSION_KEY = (projectId: string) => `sitesync-design-session:${projectId}`;
 
-function DesignScene({ iteration }: { iteration: number }) {
-  const groupRef = useThreeRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.15) * 0.1;
-    }
-  });
+function stats(s: BuildingSpec) {
+  return `${s.floors + s.podiumFloors} storeys · ${buildingHeight(s).toFixed(0)} m · ${grossFloorArea(s).toLocaleString()} m² · ${s.structure} · ${s.facade === "curtain" ? "curtain wall" : s.facade}`;
+}
 
-  const hue = (iteration * 40) % 360;
-  const color = `hsl(${hue}, 70%, 55%)`;
+function loadSession(projectId: string): { versions: Version[]; index: number } | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY(projectId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
+// ─── 3D scene ─────────────────────────────────────────────────────────────────
+
+function DesignScene({ spec, palette }: { spec: BuildingSpec; palette: ScenePalette }) {
+  const f = useMemo(() => buildingFraming(spec), [spec]);
+  const n = Math.hypot(1, 0.72, 1);
+  const pos = [1 / n, 0.72 / n, 1 / n].map((v, i) => v * f.distance + f.target[i]) as [number, number, number];
   return (
     <>
-      <PerspectiveCamera makeDefault position={[10, 8, 10]} fov={45} />
-      <OrbitControls enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 15, 10]} intensity={1} />
-      <Grid args={[24, 24]} cellColor="#334155" sectionColor="#475569" />
-      <group ref={groupRef}>
-        {/* Floor */}
-        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[8, 6]} />
-          <meshStandardMaterial color="#1e293b" />
-        </mesh>
-        {/* Walls */}
-        {[
-          { pos: [0, 1.5, 3] as [number, number, number], args: [8, 3, 0.1] as [number, number, number] },
-          { pos: [0, 1.5, -3] as [number, number, number], args: [8, 3, 0.1] as [number, number, number] },
-          { pos: [4, 1.5, 0] as [number, number, number], args: [0.1, 3, 6] as [number, number, number] },
-          { pos: [-4, 1.5, 0] as [number, number, number], args: [0.1, 3, 6] as [number, number, number] },
-        ].map((w, i) => (
-          <mesh key={i} position={w.pos}>
-            <boxGeometry args={w.args} />
-            <meshStandardMaterial color={color} transparent opacity={0.3} />
-          </mesh>
-        ))}
-        {/* Interior partitions — shift per iteration */}
-        {iteration > 0 && (
-          <mesh position={[0, 1.5, iteration % 2 === 0 ? 1 : -1]}>
-            <boxGeometry args={[4, 3, 0.1]} />
-            <meshStandardMaterial color="#64748b" transparent opacity={0.6} />
-          </mesh>
-        )}
-        {/* Furniture dots */}
-        {Array.from({ length: 6 + iteration * 2 }).map((_, i) => (
-          <mesh key={`f${i}`} position={[
-            Math.cos(i * 1.1) * (2 + (i % 2)),
-            0.4,
-            Math.sin(i * 1.1) * 1.5,
-          ]}>
-            <cylinderGeometry args={[0.2, 0.2, 0.8, 6]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-        ))}
-      </group>
-      {iteration > 0 && (
-        <Html position={[0, 5, 0]}>
-          <div className="text-[9px] bg-background/90 border border-border px-2 py-1 rounded whitespace-nowrap text-center">
-            Iteration {iteration}
-          </div>
-        </Html>
-      )}
-      <Environment preset="city" />
+      <PerspectiveCamera makeDefault position={pos} fov={42} near={0.1} far={f.distance * 12} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.05} target={f.target} />
+      <SceneLights palette={palette} extent={Math.max(f.radius, f.height)} />
+      <SceneGrid palette={palette} size={Math.max(40, f.radius * 5)} />
+      <ProceduralBuilding spec={spec} palette={palette} sway />
+      <AxisGizmo palette={palette} />
     </>
   );
 }
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, initials }: { message: Message; initials: string }) {
   const isUser = message.role === "user";
+  const live = message.status === "processing" || message.status === "pending";
   return (
-    <div className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-primary" : "bg-muted"}`}>
-        {isUser ? <User className="h-3.5 w-3.5 text-primary-foreground" /> : <Bot className="h-3.5 w-3.5 text-muted-foreground" />}
-      </div>
-      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs ${isUser ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
-        <p>{message.content}</p>
-        {message.status && message.status !== "completed" && (
-          <div className="flex items-center gap-1 mt-1 opacity-70">
-            {message.status === "processing" || message.status === "pending"
-              ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              : message.status === "failed"
-              ? <XCircle className="h-2.5 w-2.5" />
-              : null}
-            <span className="text-[9px]">{message.status}</span>
-          </div>
-        )}
-        <p className={`text-[9px] mt-1 opacity-50 ${isUser ? "text-right" : ""}`}>
+    <div className={cn("flex gap-2.5 animate-fade-in", isUser ? "flex-row-reverse" : "flex-row")}>
+      {isUser ? (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-surface-3 font-mono text-[10px] font-medium">{initials}</span>
+      ) : (
+        <BrandMark className="h-7 w-7 shrink-0" />
+      )}
+      <div className={cn("min-w-0 max-w-[85%] space-y-1", isUser && "items-end text-right")}>
+        <div
+          className={cn(
+            "inline-block whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-left text-[13px] leading-relaxed",
+            isUser ? "rounded-tr-md border border-primary/20 bg-primary/10" : "rounded-tl-md border bg-surface-2",
+          )}
+        >
+          {message.content}
+          {message.status && message.status !== "completed" && (
+            <div className="mt-2">
+              <StatusPill status={message.status} pulse={live} className="capitalize">
+                {live ? "Blender working" : message.status === "failed" ? <><XCircle className="h-3 w-3" /> failed</> : message.status}
+              </StatusPill>
+            </div>
+          )}
+        </div>
+        <p className="ss-num px-1 text-[10px] text-muted-foreground">
           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
@@ -136,258 +105,254 @@ function MessageBubble({ message }: { message: Message }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DesignAssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init",
-      role: "assistant",
-      content: "Hi! I'm your AI Design Assistant powered by Blender MCP. Describe your space or design goal and I'll iteratively refine the 3D model. You can also load a project and ask me to optimize it.",
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState("");
+  const { data: projects } = useProjects();
   const [projectId, setProjectId] = useState<string>("none");
-  const [iteration, setIteration] = useState(0);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const project = projects?.find((p) => p.id === projectId);
+
+  /** Starting design: the linked project (sized from its budget) or a concept tower. */
+  const baseSpec = useMemo(() => {
+    if (!project) return specFromPrompt("Concept Tower — 10-storey office with a retail podium");
+    const storeys = Math.max(2, Math.min(40, Math.round(Number(project.budget) / 3.5e6)));
+    return specFromPrompt(`${project.name} — ${storeys}-storey office with podium`);
+  }, [project]);
+
+  const [versions, setVersions] = useState<Version[]>(() => [{ id: "v0", spec: baseSpec, note: "Base design", createdAt: new Date().toISOString() }]);
+  const [index, setIndex] = useState(0);
+  const current = versions[Math.min(index, versions.length - 1)];
+
+  const intro = (s: BuildingSpec): Message => ({
+    id: crypto.randomUUID(),
+    role: "assistant",
+    content: `I've loaded ${s.name}: ${stats(s)}. Tell me what to change — height, structure, facade, massing, balconies, green roof — and I'll rebuild the model. Every change is saved as a version you can undo or branch.`,
+    timestamp: new Date(),
+  });
+  const [messages, setMessages] = useState<Message[]>(() => [intro(baseSpec)]);
+  const [input, setInput] = useState("");
+  const [rebuilding, setRebuilding] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: projects } = useProjects();
-  const { data: jobs } = useBlenderJobs(projectId !== "none" ? projectId : undefined);
   const createJob = useCreateBlenderJob();
-  const { data: activeJob } = useBlenderJobStatus(activeJobId);
+  const palette = useScenePalette();
+  const { profile, user } = useAuth();
+  const initials = (profile?.display_name || user?.email || "You").split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
 
-  // Auto-scroll chat
+  // Restore (or start) the session whenever the linked project changes.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const saved = loadSession(projectId);
+    if (saved?.versions?.length) {
+      setVersions(saved.versions);
+      setIndex(Math.min(saved.index, saved.versions.length - 1));
+      setMessages([{ id: crypto.randomUUID(), role: "assistant", content: `Welcome back — restored ${saved.versions.length} version${saved.versions.length === 1 ? "" : "s"} of ${saved.versions[0].spec.name}.`, timestamp: new Date() }]);
+    } else {
+      setVersions([{ id: "v0", spec: baseSpec, note: "Base design", createdAt: new Date().toISOString() }]);
+      setIndex(0);
+      setMessages([intro(baseSpec)]);
     }
+  }, [projectId, baseSpec]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESSION_KEY(projectId), JSON.stringify({ versions, index }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [versions, index, projectId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // Update message status when job status changes
-  useEffect(() => {
-    if (!activeJob || !activeJobId) return;
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.jobId === activeJobId
-          ? { ...m, status: activeJob.status }
-          : m
-      )
-    );
-    if (activeJob.status === "completed") {
-      setIteration((i) => i + 1);
-      const responseContent = `Model updated! Iteration ${iteration + 1} complete. The 3D canvas has been refreshed with your changes. You can keep refining or export the current state.`;
+  const say = (content: string, status?: Message["status"]) =>
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content, timestamp: new Date(), status }]);
+
+  const handleSend = (text = input) => {
+    const instruction = text.trim();
+    if (!instruction || rebuilding) return;
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: instruction, timestamp: new Date() }]);
+    setInput("");
+
+    const edit = applyDesignInstruction(current.spec, instruction);
+    if (!edit.changes.length) {
+      say(`I couldn't map that to a design change yet. Try things like "${DESIGN_SUGGESTIONS.slice(0, 3).join('", "')}", or "make it 20 storeys".`);
+      return;
+    }
+
+    // Log the iteration as a Blender job (history + optional real geometry service).
+    createJob.mutate({ job_type: "design-iterate", prompt: instruction, project_id: projectId !== "none" ? projectId : undefined });
+    setRebuilding(true);
+    say("Rebuilding the model…", "processing");
+    setTimeout(() => {
+      const v: Version = { id: crypto.randomUUID(), spec: edit.spec, note: instruction, createdAt: new Date().toISOString() };
+      const next = [...versions.slice(0, index + 1), v];
+      setVersions(next);
+      setIndex(next.length - 1);
+      setRebuilding(false);
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((m) => m.status !== "processing"),
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: responseContent,
+          content: `Version ${next.length - 1} is ready:\n${edit.changes.map((c) => `• ${c}`).join("\n")}\n\nNow: ${stats(edit.spec)}.`,
           timestamp: new Date(),
           status: "completed",
         },
       ]);
-    } else if (activeJob.status === "failed") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `Generation failed: ${activeJob.error_message ?? "Unknown error"}. Please try again.`,
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  }, [activeJob?.status]);
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-
-    // Create Blender job
-    try {
-      const job = await createJob.mutateAsync({
-        job_type: "design-iterate",
-        prompt: input.trim(),
-        project_id: projectId !== "none" ? projectId : undefined,
-      });
-      setActiveJobId(job.id);
-
-      // Add assistant thinking message
-      const thinkingMsg: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `Got it — sending to Blender: "${input.trim().slice(0, 60)}${input.length > 60 ? "…" : ""}". This will take a moment…`,
-        timestamp: new Date(),
-        jobId: job.id,
-        status: "processing",
-      };
-      setMessages((prev) => [...prev, thinkingMsg]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Failed to connect to the Blender service. Make sure the backend is running on port 3999.",
-          timestamp: new Date(),
-        },
-      ]);
-    }
+    }, 900);
   };
 
   const handleUndo = () => {
-    if (iteration > 0) {
-      setIteration((i) => i - 1);
-      setMessages((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: `Reverted to iteration ${iteration - 1}.`, timestamp: new Date() },
-      ]);
-    }
+    if (index === 0) return;
+    setIndex(index - 1);
+    say(`Reverted to version ${index - 1}: ${stats(versions[index - 1].spec)}.`);
+  };
+
+  const handleBranch = () => {
+    const v: Version = { id: crypto.randomUUID(), spec: { ...current.spec }, note: `Branch of v${index}`, createdAt: new Date().toISOString() };
+    const next = [...versions, v];
+    setVersions(next);
+    setIndex(next.length - 1);
+    say(`Branched version ${index} into version ${next.length - 1}. Later versions are kept, so you can compare both directions in the history below.`);
+  };
+
+  const restore = (i: number) => {
+    setIndex(i);
+    say(`Restored version ${i} (${versions[i].note}).`);
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Design Assistant</h1>
-            <Badge variant="outline" className="text-[10px]">Spatial Workbench</Badge>
-            <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/20 border">Blender MCP</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Iteratively refine 3D designs through natural language conversation.
-          </p>
-        </div>
-        <Select value={projectId} onValueChange={setProjectId}>
-          <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Link project" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No project</SelectItem>
-            {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Design Assistant"
+        description="Shape a building in conversation — every request rebuilds the 3D model and is saved as a version you can undo, branch or restore."
+        actions={
+          <>
+            <StatusPill status="Blender MCP" tone="data" pulse />
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger className="w-full sm:w-[220px]" aria-label="Project"><SelectValue placeholder="Link project" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Concept (no project)</SelectItem>
+                {projects?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4" style={{ height: "calc(100vh - 220px)" }}>
-        {/* Chat panel */}
-        <div className="lg:col-span-2 flex flex-col gap-3">
-          <Card className="flex-1 flex flex-col overflow-hidden">
-            <CardHeader className="pb-2 shrink-0">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-blue-500" />
-                Design Chat
-                {iteration > 0 && (
-                  <Badge variant="outline" className="text-[10px] ml-auto">Iteration {iteration}</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-              {/* Messages */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
-              </div>
-
-              {/* Suggestions */}
-              {messages.length <= 2 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                    <Lightbulb className="h-3 w-3" /> Try asking
-                  </p>
-                  {DESIGN_SUGGESTIONS.slice(0, 3).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setInput(s)}
-                      className="w-full text-left text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      {s}
-                    </button>
+      <div className="grid gap-4 lg:h-[calc(100svh-250px)] lg:min-h-[560px] lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        {/* Viewport (first on mobile) */}
+        <Viewport
+          className="order-first h-[340px] sm:h-[420px] lg:order-last lg:h-full"
+          overlay={
+            <>
+              <ViewportSlot at="top-left">
+                <Readout className="text-foreground">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", rebuilding ? "animate-pulse bg-primary" : "bg-success")} />
+                  {rebuilding ? "Rebuilding…" : `${current.spec.name} · v${index}`}
+                </Readout>
+              </ViewportSlot>
+              <ViewportSlot at="top-right" className="hidden sm:flex">
+                <Readout className="ss-num">{stats(current.spec)}</Readout>
+              </ViewportSlot>
+              <ViewportSlot at="bottom-left" className="max-w-[calc(100%-120px)]">
+                <div className="flex items-center gap-1 overflow-x-auto rounded-lg border border-border/80 bg-background/75 px-2 py-1.5 backdrop-blur-md" aria-label="Version timeline">
+                  {versions.map((v, i) => (
+                    <span key={v.id} className="flex shrink-0 items-center gap-1">
+                      {i > 0 && <span className="h-px w-3 bg-border-strong" />}
+                      <button
+                        onClick={() => restore(i)}
+                        title={v.note}
+                        className={cn("ss-num flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] transition-colors", i === index ? "bg-mod-spatial text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                      >
+                        v{i}
+                      </button>
+                    </span>
                   ))}
                 </div>
-              )}
+              </ViewportSlot>
+            </>
+          }
+        >
+          <Canvas shadows dpr={[1, 2]} aria-label="Design model">
+            <Suspense fallback={<SceneFallback />}>
+              <DesignScene spec={current.spec} palette={palette} />
+            </Suspense>
+          </Canvas>
+        </Viewport>
 
-              {/* Input */}
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Describe a design change…"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  rows={2}
-                  className="text-xs resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                  }}
-                />
-                <Button size="icon" onClick={handleSend} disabled={!input.trim() || createJob.isPending} className="shrink-0 self-end">
-                  {createJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Chat */}
+        <section className="ss-card flex h-[560px] min-h-0 flex-col lg:h-full">
+          <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="min-w-0">
+              <p className="ss-eyebrow">Conversation</p>
+              <h2 className="text-[14px] font-semibold">Design chat</h2>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="ss-num mr-1 rounded-md border bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-muted-foreground">V{String(index).padStart(2, "0")}</span>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleUndo} disabled={index === 0 || rebuilding} title="Undo to previous version" aria-label="Undo to previous version"><RotateCcw /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleBranch} disabled={rebuilding} title="Branch this version" aria-label="Branch this version"><GitBranch /></Button>
+            </div>
+          </header>
 
-          {/* Iteration controls */}
-          <Card>
-            <CardContent className="p-3 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={handleUndo} disabled={iteration === 0}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Undo
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {messages.map((m) => <MessageBubble key={m.id} message={m} initials={initials} />)}
+          </div>
+
+          <div className="space-y-2.5 border-t p-3">
+            <div className="flex flex-wrap gap-1.5">
+              <Lightbulb className="mt-1 h-3.5 w-3.5 text-muted-foreground" />
+              {DESIGN_SUGGESTIONS.slice(0, messages.length <= 2 ? 4 : 3).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSend(s)}
+                  disabled={rebuilding}
+                  className="rounded-full border px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="relative rounded-xl border bg-surface-2/50 transition-[border-color,box-shadow] focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]">
+              <Textarea
+                placeholder="e.g. Add 4 floors and switch to mass timber…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                rows={2}
+                className="min-h-[64px] resize-none border-0 bg-transparent pr-12 text-[13px] shadow-none focus-visible:ring-0"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
+              />
+              <Button size="icon" onClick={() => handleSend()} disabled={!input.trim() || rebuilding} className="absolute bottom-2 right-2 h-8 w-8" aria-label="Send">
+                {rebuilding ? <Loader2 className="animate-spin" /> : <ArrowUp />}
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 text-xs" disabled={iteration === 0}>
-                <GitBranch className="h-3.5 w-3.5 mr-1.5" /> Branch Variant
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 3D canvas */}
-        <div className="lg:col-span-3">
-          <Card className="h-full">
-            <CardContent className="p-0 h-full">
-              <div className="h-full min-h-[400px] rounded-lg overflow-hidden bg-muted/20 relative">
-                <Canvas shadows>
-                  <Suspense fallback={<Html center><div className="text-xs text-muted-foreground">Loading…</div></Html>}>
-                    <DesignScene iteration={iteration} />
-                  </Suspense>
-                </Canvas>
-                {iteration > 0 && (
-                  <div className="absolute top-3 left-3 bg-background/80 backdrop-blur rounded-full px-3 py-1 text-xs font-medium border">
-                    Iteration {iteration}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <p className="hidden text-[10.5px] text-muted-foreground sm:block"><kbd className="ss-kbd">↵</kbd> send · <kbd className="ss-kbd">Shift</kbd>+<kbd className="ss-kbd">↵</kbd> new line</p>
+          </div>
+        </section>
       </div>
 
       {/* History */}
-      {jobs && jobs.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Design History ({jobs.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {jobs.map((job, i) => (
-                <div key={job.id} className="shrink-0 w-32 border rounded-lg p-2 text-center space-y-1 hover:border-primary/50 cursor-pointer transition-colors">
-                  <div className="aspect-square bg-muted/30 rounded flex items-center justify-center">
-                    <span className="text-lg font-bold text-muted-foreground">{jobs.length - i}</span>
-                  </div>
-                  <p className="text-[9px] text-muted-foreground truncate">{job.prompt ?? "Design iterate"}</p>
-                  <Badge variant="outline" className={`text-[9px] w-full justify-center ${
-                    job.status === "completed" ? "border-emerald-500/30 text-emerald-600" :
-                    job.status === "failed" ? "border-destructive/30 text-destructive" :
-                    "border-amber-500/30 text-amber-600"
-                  }`}>{job.status}</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Panel eyebrow="Versions" title={<span className="flex items-center gap-2">Design history <span className="ss-num text-xs font-normal text-muted-foreground">{versions.length}</span></span>}>
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {versions.map((v, i) => (
+            <button
+              key={v.id}
+              onClick={() => restore(i)}
+              aria-pressed={i === index}
+              className={cn("ss-card ss-interactive w-48 shrink-0 space-y-2 p-3 text-left", i === index && "border-mod-spatial/50 shadow-[0_0_0_1px_hsl(var(--mod-spatial)/0.4)]")}
+            >
+              <span className="flex items-center justify-between">
+                <span className="ss-num text-lg">v{i}</span>
+                {i === index && <StatusPill status="Current" tone="info" />}
+              </span>
+              <span className="line-clamp-2 block min-h-[2.5em] text-[12px]">{v.note}</span>
+              <span className="ss-num block text-[10.5px] text-muted-foreground">
+                {v.spec.floors + v.spec.podiumFloors} st · {buildingHeight(v.spec).toFixed(0)} m · {v.spec.structure}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }

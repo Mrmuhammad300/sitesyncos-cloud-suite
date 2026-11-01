@@ -70,7 +70,7 @@ export function printToPDF(title: string, tableHtml: string) {
   <h1>${title}</h1>
   <p class="meta">Exported ${new Date().toLocaleDateString("en-US", { dateStyle: "long" })} · SiteSync Cloud Suite</p>
   ${tableHtml}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+  <script>window.onload = () => { window.print(); window.close(); }</script>
 </body></html>`);
   win.document.close();
 }

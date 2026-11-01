@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { IS_DEMO } from "@/lib/demo";
+
 const BLENDER_API_URL = import.meta.env.VITE_BLENDER_API_URL ?? "http://localhost:3999";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,8 +122,9 @@ export function useCreateBlenderJob() {
         .single();
       if (error) throw error;
 
-      // Fire-and-forget POST to backend API (non-blocking; status polled via useBlenderJobStatus)
-      try {
+      // Fire-and-forget POST to backend API (non-blocking; status polled via useBlenderJobStatus).
+      // In demo mode the in-browser backend simulates the worker instead.
+      if (!IS_DEMO) try {
         const form = new FormData();
         form.append("job_id", (job as BlenderJob).id);
         form.append("job_type", payload.job_type);
@@ -186,6 +189,27 @@ export function useFloorPlanVariants(projectId?: string) {
       return data as FloorPlanVariant[];
     },
     staleTime: 60_000,
+  });
+}
+
+export function useCreateFloorPlanVariants() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Array<Pick<FloorPlanVariant, "variant_name" | "layout_json" | "metrics" | "notes"> & { project_id?: string | null; blender_job_id?: string | null }>) => {
+      const { data: existing } = await supabase.from("floor_plan_variants" as never).select("variant_number");
+      const start = ((existing ?? []) as { variant_number: number }[]).reduce((m, r) => Math.max(m, r.variant_number ?? 0), 0);
+      const { data, error } = await supabase
+        .from("floor_plan_variants" as never)
+        .insert(rows.map((r, i) => ({ ...r, variant_number: start + i + 1, status: "draft" })) as never)
+        .select();
+      if (error) throw error;
+      return data as FloorPlanVariant[];
+    },
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: ["floor_plan_variants"] });
+      toast.success(`${rows.length} floor plan options sent to Floor Plans`);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
