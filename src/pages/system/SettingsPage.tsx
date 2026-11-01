@@ -10,6 +10,7 @@ import { PageHeader, Panel, StatusPill } from "@/components/os";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme, type ThemePreference } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 
 /** Non-theme display preferences. Theme itself lives in useTheme(). */
 const PREFS_KEY = "sitesync-preferences";
@@ -122,9 +123,10 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = async () => {
-    if (!user?.email) return;
+    const email = user?.email;
+    if (!email) return;
     const { error } = await import("@/integrations/supabase/client").then(m =>
-      m.supabase.auth.resetPasswordForEmail(user.email!, {
+      m.supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
     );
@@ -307,6 +309,7 @@ export default function SettingsPage() {
 
           {/* Security */}
           <Panel id="settings-security" eyebrow="Security" title="Password & session" className="scroll-mt-6">
+            {user && <ChangePasswordForm account={user} />}
             <div className="divide-y">
               <Field stack label="Password" hint={`A reset link will be sent to ${user?.email ?? "your email"}.`}>
                 <Button size="sm" variant="outline" onClick={handleChangePassword}>
